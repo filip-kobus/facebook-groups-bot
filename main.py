@@ -160,8 +160,9 @@ async def main():
         if not is_auth:
             await login(page)
             await confirm_cookies(page)
+        group_id = "1378465175518200"
 
-        await page.goto("https://www.facebook.com/groups/1777085299125693/?sorting_setting=CHRONOLOGICAL")
+        await page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
         await close_notification_popup(page)
         await get_first_post_date(page)
         input()
