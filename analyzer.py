@@ -46,7 +46,7 @@ async def analyze_posts_batch(posts: List[Dict]) -> List[Dict]:
     
     result = await agent.run(input_text)
     
-    analysis_map = {analysis.post_id: analysis for analysis in result.data.results}
+    analysis_map = {analysis.post_id: analysis for analysis in result.output.results}
     
     enriched_posts = []
     for post in posts:
