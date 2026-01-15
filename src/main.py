@@ -1,9 +1,9 @@
 import asyncio
 import random
-from scraper import scrape_posts, init_browser
-from analyzer import analyze_posts_batch, batch_posts
-from csv_handler import initialize_csv, append_posts_to_csv
-from groups import groups_ids
+from src.scraper import scrape_posts, init_browser
+from src.analyzer import analyze_posts_batch, batch_posts
+from src.csv_handler import initialize_csv, append_posts_to_csv
+from src.groups import groups_ids
 
 async def random_delay_between_groups():
     delay = random.uniform(30, 60)
