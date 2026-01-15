@@ -5,8 +5,10 @@ import time
 import random
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright, Page
+import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
+from loguru import logger
 from config import DAYS_BACK, MAX_SCROLLS, THINKING_TIME_SCALE
 
 load_dotenv()
@@ -29,8 +31,8 @@ class FacebookScraper:
         """
         self.days_back = days_back
         self.max_scrolls = max_scrolls
-        self.thinking_time_scale = max(0, min(10, thinking_time_scale))  # Clamp to 0-10
-        self.thinking_time = self.thinking_time_scale * 0.5  # Convert scale to seconds
+        self.thinking_time_scale = max(0, min(10, thinking_time_scale))
+        self.hours_back = days_back * 24
         
         self.playwright = None
         self.browser = None
@@ -54,19 +56,19 @@ class FacebookScraper:
             print(f"⏱️  Thinking... ({delay:.2f}s)")
             await asyncio.sleep(delay)
 
-    async def thinking_pause(self):
-        """Pause for thinking time if scale > 0."""
-        delay = await self._get_thinking_delay()
-        if delay > 0:
-            print(f"⏱️  Thinking... ({delay:.2f}s)")
-            await asyncio.sleep(delay)
-
     @staticmethod
     def parse_facebook_date(date_str: str) -> Optional[datetime]:
         """Parse Facebook date string to datetime object."""
         try:
-            if "," in date_str:
+            # Remove time portion if present: "Thursday, January 15, 2026 at 9:42 PM" → "Thursday, January 15, 2026"
+            if " at " in date_str:
+                date_str = date_str.split(" at ")[0]
+            elif " o " in date_str:  # Polish format
                 date_str = date_str.split(" o ")[0]
+            
+            # Remove day name if present: "Thursday, January 15, 2026" → "January 15, 2026"
+            if "," in date_str:
+                date_str = ",".join(date_str.split(",")[1:]).strip()
             
             months = {
                 "stycznia": 1, "lutego": 2, "marca": 3, "kwietnia": 4,
@@ -77,21 +79,33 @@ class FacebookScraper:
                 "September": 9, "October": 10, "November": 11, "December": 12
             }
             
-            parts = date_str.split()
-            day = int(parts[-3])
-            month_name = parts[-2]
-            year = int(parts[-1])
+            # Now we have: "January 15, 2026" or "15 stycznia 2026"
+            parts = date_str.replace(",", "").split()
+            
+            if len(parts) < 3:
+                return None
+            
+            # Detect format: English (Month Day Year) vs Polish (Day Month Year)
+            first_part = parts[0]
+            if first_part in months:  # English: "January 15 2026"
+                month_name = parts[0]
+                day = int(parts[1])
+                year = int(parts[2])
+            else:  # Polish: "15 stycznia 2026"
+                day = int(parts[0])
+                month_name = parts[1]
+                year = int(parts[2])
             
             month = months.get(month_name)
             if month:
                 return datetime(year, month, day)
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to parse Facebook date '{date_str}': {e}")
         
         return None
     
     def is_post_recent(self, post_date_str: str) -> bool:
-        """Check if post is within the specified days_back range."""
+        """Check if post is within the specified hours_back range."""
         if not post_date_str:
             return True
         
@@ -99,16 +113,14 @@ class FacebookScraper:
         if not post_date:
             return True
         
-        cutoff_date = datetime.now() - timedelta(days=self.days_back)
-        return post_date >= cutoff_date
+        cutoff_time = datetime.now() - timedelta(hours=self.hours_back)
+        return post_date >= cutoff_time
 
-        cutoff_date = datetime.now() - timedelta(days=self.days_back)
-        return post_date >= cutoff_date
-
-    @staticmethod
-    async def random_delay(min_seconds: float = 1.5, max_seconds: float = 4.0):
-        """Random delay between actions."""
-        await asyncio.sleep(random.uniform(min_seconds, max_seconds))
+    async def random_delay(self, min_seconds: float = 1.5, max_seconds: float = 4.0):
+        """Random delay between actions, scaled by thinking_time_scale."""       
+        scaled_min = min_seconds * self.thinking_time_scale
+        scaled_max = max_seconds * self.thinking_time_scale
+        await asyncio.sleep(random.uniform(scaled_min, scaled_max))
     
     async def human_like_scroll(self):
         """Perform human-like scrolling on the page."""
@@ -130,9 +142,7 @@ class FacebookScraper:
             x = random.randint(100, viewport["width"] - 100)
             y = random.randint(100, viewport["height"] - 100)
             await self.page.mouse.move(x, y)
-            await asyncio.sleep(random.uniform(0.1, 0.3))
-
-            await asyncio.sleep(random.uniform(0.1, 0.3))
+            await self.random_delay(0.1, 0.3)
     
     async def login(self):
         """Login to Facebook with human-like behavior."""
@@ -142,8 +152,8 @@ class FacebookScraper:
         try:
             await self.page.get_by_role("button", name="Allow all cookies").click()
             await self.random_delay(1, 2)
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"No cookie consent button found or failed to click: {e}")
         
         email_field = self.page.get_by_label("Email or phone number")
         await email_field.click()
@@ -193,28 +203,27 @@ class FacebookScraper:
                 return False
             
             return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to validate authentication cookies: {e}")
             return False
     
     async def confirm_cookies(self):
         """Confirm cookies if popup appears."""
         try:
             await self.page.get_by_role("button", name="Allow all cookies").click(timeout=5000)
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"No cookie popup to confirm: {e}")
     
     async def close_notification_popup(self):
         """Close notification popup if it appears."""
         try:
             close_button = self.page.get_by_role("button", name="Close")
-            await close_button.wait_for(state="visible", timeout=10000)
+            await close_button.wait_for(state="visible", timeout=2000)
             await self.random_delay(0.5, 1.5)
             await close_button.click()
             await self.random_delay(1, 2)
-        except:
-            pass
-
-            pass
+        except Exception as e:
+            logger.debug(f"No notification popup to close: {e}")
 
     async def init_browser(self) -> Tuple:
         """Initialize browser and authenticate."""
@@ -265,12 +274,155 @@ class FacebookScraper:
         if not is_auth:
             await self.login()
             await self.confirm_cookies()
+            await self.save_cookies()
+            logger.info("Cookies saved after login")
         
         return self.playwright, self.browser, self.context, self.page
 
-        return self.playwright, self.browser, self.context, self.page
+    async def is_x_hours_older(self, post_date_str: str, hours: int) -> bool:
+        """Check if post is older than specified hours."""
+        if not post_date_str:
+            return False
+        
+        post_date = self.parse_facebook_date(post_date_str)
+        if not post_date:
+            return False
+        
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        return post_date < cutoff_time
 
     async def scrape_posts(self, group_id: str) -> List[Dict]:
+        """Test scraping with dynamic list growth using while loop."""
+        await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
+        await self.random_delay(1, 2)
+        await self.close_notification_popup()
+
+        try:
+            await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=3000)
+        except Exception as e:
+            logger.debug(f"Timeout waiting for posts to load: {e}")
+        
+        await self.human_like_scroll()
+        await self.random_delay(2, 3)
+        posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+        number_of_posts = len(posts)
+        logger.debug(f"Found {number_of_posts} total posts in DOM")
+        current_index = 0
+        data_postu = None
+        dane_z_postu = []
+
+        is_recent = self.is_post_recent(data_postu)
+        while is_recent:
+            if current_index >= number_of_posts - 2:
+                await self.human_like_scroll()
+                await self.random_delay(1, 2)
+                posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+                number_of_posts = len(posts)
+                logger.debug(f"Found {number_of_posts} total posts in DOM")
+
+            await self.random_delay(2, 4)
+            post = posts[current_index]
+            
+            
+            try:
+                await post.scroll_into_view_if_needed(timeout=1000)
+            except:
+                logger.debug("Failed to scroll to post, skipping")
+                input()
+                continue              
+            author_locator = post.locator('b').first
+            try:
+                await author_locator.scroll_into_view_if_needed(timeout=000)
+                await self.random_delay(1, 2)
+            except:
+                logger.debug("Failed to scroll to author locator, skipping post")
+                current_index += 1
+                continue
+            author_name = await author_locator.inner_text()
+
+            if "Anonymous" in author_name or "Anonimowy" in author_name:
+                logger.debug("Skipping anonymous post")
+                current_index += 1
+                continue
+
+            available_links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
+            await author_locator.scroll_into_view_if_needed(timeout=5000)
+            await self.random_delay(0.2, 0.5)
+            participant_anchor_link = await available_links[0].get_attribute("href", timeout=5000)
+            participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
+
+            for link in available_links[1:5]:
+                try:
+                    if not await link.is_visible():
+                        continue
+                    
+                    await link.scroll_into_view_if_needed(timeout=2000)
+                    await self.random_delay(1.3, 1.7)
+                    await link.hover(timeout=5000)
+                    
+                    tooltip = self.page.locator('[role="tooltip"]')
+                    tooltip_text = await tooltip.inner_text(timeout=1000)
+                    await self.random_delay(0.5, 1.0)
+                    
+                    has_time = re.search(r'\d{1,2}:\d{2}', tooltip_text)
+                    has_day = re.search(r'\b\d{1,2}\b', tooltip_text) 
+                    if has_time or has_day:
+                        data_postu = tooltip_text
+                        is_recent = self.is_post_recent(data_postu)
+                        logger.debug(f"Found tooltip with date/time: {tooltip_text}")
+                        break
+                    else:                    
+                        logger.debug(f"Tooltip does not contain date/time: {tooltip_text}")
+                except Exception as e:
+                    logger.debug(f"Failed to hover or get tooltip: {str(e)}")
+                    continue
+                
+            await post.scroll_into_view_if_needed(timeout=5000)
+            await self.random_delay(0.2, 0.5)
+            logger.debug(f"Processing initial post at index {current_index}")
+            
+            text_locator = post.locator('[data-ad-rendering-role="story_message"]')
+            if not await text_locator.count():
+                logger.debug("No text content found in post, skipping")
+                continue
+            
+            post_text = await text_locator.first.inner_text()
+            expand_name = "See more" if "See more" in post_text else "Zobacz więcej"
+
+            if expand_name.lower() in post_text.lower():
+                try:
+                    logger.debug("Expanding 'See more' content")
+                    see_more = post.locator(f'[role="button"]:has-text("{expand_name}")')
+                    await see_more.scroll_into_view_if_needed(timeout=3000)
+                    await self.random_delay(0.5, 1.2)
+                    await see_more.click(timeout=3000)
+                    await self.random_delay(0.8, 1.5)
+                    post_text = await text_locator.inner_text()
+                    if len(post_text) > 3000:
+                        await self.human_like_scroll()
+                except Exception as e:
+                    logger.debug(f"Failed to click 'See more' button: {e}")
+
+            current_index += 1
+
+            print(f"\n{'─'*80}")
+            print(f"📝 POST #{len(dane_z_postu) + 1}")
+            print(f"👤 Author: {author_name}")
+            print(f"📅 Date: {data_postu or 'N/A'}")
+            print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
+
+            dane_z_postu.append({
+                "id": f"{group_id}_{participant_id}_{current_index}",
+                "author": author_name,
+                "user_id": participant_id,
+                "content": post_text,
+                "date": data_postu,
+                "group_id": group_id
+            })
+        
+        return dane_z_postu
+
+    async def _scrape_posts(self, group_id: str) -> List[Dict]:
         """Scrape posts from a Facebook group."""
         await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
         await self.random_delay(3, 5)
@@ -280,115 +432,154 @@ class FacebookScraper:
         await self.human_like_scroll()
         
         posts_data = []
-        seen_ids = set()
         should_continue = True
         scroll_count = 0
+        no_new_posts_count = 0
         
-        await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=15000)
+        try:
+            await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=3000)
+        except Exception as e:
+            logger.debug(f"Timeout waiting for posts to load: {e}")
+        
         await self.random_delay(2, 3)
-        
-        while should_continue and scroll_count < self.max_scrolls:
-            posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+
+        posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+        logger.debug(f"Found {len(posts)} total posts in DOM")
+
             
-            new_posts_found = False
-        
-            for i, post in enumerate(posts):
-                await self.random_delay(0.3, 0.8)
+        for post in posts:
+            # try:
+            aria_pos = await post.get_attribute('aria-posinset')
+            #     post_element_id = f"{group_id}_pos_{aria_pos}"
                 
-                # Add thinking pause when configured
-                await self.thinking_pause()
+            #     # Skip if already processed
+            #     if post_element_id in seen_ids:
+            #         continue
                     
+            #     seen_ids.add(post_element_id)
+            # except:
+            #     continue
+            
+            # Small delay between checking posts
+            await self.random_delay(0.3, 0.8)
+                
+            try:
+                author_locator = post.locator('h2').first
+                await author_locator.scroll_into_view_if_needed(timeout=5000)
+                await self.random_delay(0.2, 0.5)
+                author_name = await author_locator.inner_text()
+            except Exception as e:
+                logger.debug(f"Failed to extract author name from post: {e}")
+                continue
+            
+            if "Anonymous" in author_name or "Anonimowy" in author_name:
+                logger.debug("Skipping anonymous post")
+                continue
+            
+            text_locator = post.locator('[data-ad-rendering-role="story_message"]')
+            if not await text_locator.count():
+                logger.debug("No text content found in post, skipping")
+                continue
+            
+            post_text = await text_locator.inner_text()
+            expand_name = "See more" if "See more" in post_text else "Zobacz więcej"
+            if expand_name.lower() in post_text.lower():
                 try:
-                    author_locator = post.locator('h2').first
-                    await author_locator.scroll_into_view_if_needed(timeout=5000)
-                    await self.random_delay(0.2, 0.5)
-                    author_name = await author_locator.inner_text()
-                except:
-                    continue
-                
-                if "Anonymous" in author_name or "Anonimowy" in author_name:
-                    continue
-                
-                text_locator = post.locator('[data-ad-rendering-role="story_message"]')
-                if not await text_locator.count():
-                    continue
-                
-                post_text = await text_locator.inner_text()
-                if "See More" in post_text or "See more" in post_text:
+                    logger.debug("Expanding 'See more' content")
+                    see_more = post.locator(f'[role="button"]:has-text("{expand_name}")')
+                    await see_more.scroll_into_view_if_needed(timeout=3000)
+                    await self.random_delay(0.5, 1.2)
+                    await see_more.click(timeout=3000)
+                    await self.random_delay(0.8, 1.5)
+                    post_text = await text_locator.inner_text()
+                except Exception as e:
+                    logger.debug(f"Failed to click 'See more' button: {e}")
+            
+            try:
+                links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
+                participant_anchor_link = await links[0].get_attribute("href", timeout=5000)
+                participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
+            except Exception as e:
+                logger.debug(f"Failed to extract participant ID: {e}")
+                participant_id = "unknown"
+            
+            post_date = None
+            try:
+                candidates = links[3:5]
+                for date_link in candidates:
+                    await self.random_delay(0.3, 0.7)
+                    await date_link.hover()
+                    tooltip = self.page.locator('[role="tooltip"]')
                     try:
-                        see_more = post.locator('[role="button"]:has-text("See more")')
-                        await see_more.scroll_into_view_if_needed(timeout=3000)
-                        await self.random_delay(0.5, 1.2)
-                        await see_more.click(timeout=3000)
-                        await self.random_delay(0.8, 1.5)
-                        post_text = await text_locator.inner_text()
-                    except:
-                        pass
-                
-                try:
-                    links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
-                    participant_anchor_link = await links[0].get_attribute("href", timeout=5000)
-                    participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
-                except:
-                    participant_id = "unknown"
-                
-                post_id = f"{group_id}_{participant_id}_{i}"
-                if post_id in seen_ids:
-                    continue
-                
-                post_date = None
-                try:
-                    candidates = links[3:5]
-                    for date_link in candidates:
-                        await self.random_delay(0.3, 0.7)
-                        await date_link.hover()
-                        tooltip = self.page.locator('[role="tooltip"]')
-                        try:
-                            await tooltip.wait_for(state="visible", timeout=2000)
-                            post_date = await tooltip.inner_text()
-                            await self.random_delay(0.2, 0.5)
-                            break
-                        except:
-                            continue
-                except:
-                    pass
-                
-                if not self.is_post_recent(post_date):
-                    print(f"\n⏹️  Reached posts older than {self.days_back} days, stopping...")
-                    should_continue = False
-                    break
-                
-                seen_ids.add(post_id)
-                new_posts_found = True
-                
-                print(f"\n{'─'*80}")
-                print(f"📝 POST #{len(posts_data) + 1}")
-                print(f"👤 Author: {author_name}")
-                print(f"📅 Date: {post_date or 'N/A'}")
-                print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
-                print(f"{'─'*80}")
-                
-                posts_data.append({
-                    "id": post_id,
-                    "author": author_name,
-                    "user_id": participant_id,
-                    "content": post_text,
-                    "date": post_date,
-                    "group_id": group_id
-                })
+                        await tooltip.wait_for(state="visible", timeout=2000)
+                        post_date = await tooltip.inner_text()
+                        await self.random_delay(0.2, 0.5)
+                        break
+                    except Exception as e:
+                        logger.debug(f"Failed to get tooltip for date: {e}")
+                        continue
+            except Exception as e:
+                logger.debug(f"Failed to extract post date: {e}")
+            
+            if not self.is_post_recent(post_date):
+                logger.info(f"Reached posts older than {self.days_back} days, stopping...")
+                should_continue = False
+                break
+            
+            print(f"\n{'─'*80}")
+            print(f"📝 POST #{len(posts_data) + 1}")
+            print(f"👤 Author: {author_name}")
+            print(f"📅 Date: {post_date or 'N/A'}")
+            print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
+            print(f"{'─'*80}")
+            
+            posts_data.append({
+                "id": f"{group_id}_{participant_id}_{aria_pos}",
+                "author": author_name,
+                "user_id": participant_id,
+                "content": post_text,
+                "date": post_date,
+                "group_id": group_id
+            })
             
             if not should_continue:
                 break
-            
-            if new_posts_found:
-                await self.human_like_scroll()
-                await self.random_delay(2, 4)
-                scroll_count += 1
+
+            if new_posts_found > 0:
+                no_new_posts_count = 0
             else:
-                await self.human_like_scroll()
-                await self.random_delay(2, 4)
-                scroll_count += 1
+                no_new_posts_count += 1
+                logger.debug(f"No new posts found, attempt {no_new_posts_count}/5")
+            
+            # Always scroll to trigger loading more posts
+            # Get current post count before scrolling
+            posts_count_before = len(posts)
+            
+            # Scroll to bottom of page (more reliable than scrolling to last element)
+            await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            logger.debug("Scrolled to bottom of page")
+            
+            # Wait for potential new posts to load
+            await self.random_delay(3, 5)
+            
+            # Check if new posts appeared in DOM
+            try:
+                await self.page.wait_for_function(
+                    f"document.querySelectorAll('[role=\"feed\"] [aria-posinset]').length > {posts_count_before}",
+                    timeout=5000
+                )
+                logger.debug("New posts detected in DOM")
+            except:
+                logger.debug("No new posts loaded after scroll")
+            
+            # If no new posts after 5 attempts, stop
+            if no_new_posts_count >= 5:
+                logger.info("No new posts found after 5 attempts, stopping")
+                break
+                
+            scroll_count += 1
         
+        logger.info(f"Scraping complete: {len(posts_data)} total posts collected")
         return posts_data
     
     async def save_cookies(self):

@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 from typing import List, Dict
 from pathlib import Path
+from loguru import logger
 
 
 class ExcelExporter:

@@ -36,6 +36,8 @@ setup: ## Complete first-time setup (venv + dependencies + playwright)
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 	@$(VENV_BIN)/playwright install chromium
 	@echo "$(GREEN)✓ Playwright browser installed$(NC)"
+	@mkdir -p logs
+	@echo "$(GREEN)✓ Logs directory created$(NC)"
 	@echo ""
 	@echo "$(GREEN)✓ Setup complete!$(NC)"
 	@echo "$(YELLOW)Next step: Create .env file with your credentials$(NC)"
@@ -56,21 +58,25 @@ playwright: ## Install/reinstall Playwright browsers
 	@echo "$(GREEN)✓ Playwright browsers installed$(NC)"
 
 run: ## Run the Facebook groups bot
+	@mkdir -p logs
 	@echo "$(BLUE)Starting Facebook Groups Bot...$(NC)"
 	@echo "$(YELLOW)Thinking time scale: Check config.py (THINKING_TIME_SCALE)$(NC)"
 	@$(PYTHON_VENV) -m src.main
 
 run-fast: ## Run with thinking time scale = 0 (fastest)
+	@mkdir -p logs
 	@echo "$(BLUE)Starting bot in FAST mode (no thinking delay)...$(NC)"
 	@sed -i 's/THINKING_TIME_SCALE = .*/THINKING_TIME_SCALE = 0/' config.py
 	@$(PYTHON_VENV) -m src.main
 
 run-normal: ## Run with thinking time scale = 5 (balanced)
+	@mkdir -p logs
 	@echo "$(BLUE)Starting bot in NORMAL mode (2.5s thinking delay)...$(NC)"
 	@sed -i 's/THINKING_TIME_SCALE = .*/THINKING_TIME_SCALE = 5/' config.py
 	@$(PYTHON_VENV) -m src.main
 
 run-safe: ## Run with thinking time scale = 10 (safest)
+	@mkdir -p logs
 	@echo "$(BLUE)Starting bot in SAFE mode (5s thinking delay)...$(NC)"
 	@sed -i 's/THINKING_TIME_SCALE = .*/THINKING_TIME_SCALE = 10/' config.py
 	@$(PYTHON_VENV) -m src.main
@@ -83,6 +89,11 @@ clean: ## Clean Python cache files
 	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 	@rm -f leads.csv 2>/dev/null || true
 	@echo "$(GREEN)✓ Cache cleaned$(NC)"
+
+clean-logs: ## Clean old log files (keeps last 7 days)
+	@echo "$(BLUE)Cleaning old logs...$(NC)"
+	@find logs -name "bot_*.log" -type f -mtime +7 -delete 2>/dev/null || true
+	@echo "$(GREEN)✓ Old logs cleaned$(NC)"
 
 clean-all: clean ## Clean everything including venv
 	@echo "$(YELLOW)Removing virtual environment...$(NC)"
@@ -120,7 +131,27 @@ config: ## Open config.py for editing
 
 logs: ## Show recent execution logs (if any)
 	@echo "$(BLUE)Recent logs:$(NC)"
-	@echo "$(YELLOW)Note: Logs are displayed in terminal during execution$(NC)"
+	@if [ -d logs ] && [ -n "$$(ls -A logs 2>/dev/null)" ]; then \
+		tail -n 50 logs/bot_$$(date +%Y-%m-%d).log 2>/dev/null || \
+		tail -n 50 logs/$$(ls -t logs/ | head -1) 2>/dev/null || \
+		echo "$(YELLOW)No logs found$(NC)"; \
+	else \
+		echo "$(YELLOW)No logs directory or files found$(NC)"; \
+	fi
+
+logs-full: ## Show full today's log file
+	@if [ -f logs/bot_$$(date +%Y-%m-%d).log ]; then \
+		less logs/bot_$$(date +%Y-%m-%d).log; \
+	else \
+		echo "$(YELLOW)No log file for today$(NC)"; \
+	fi
+
+logs-errors: ## Show only ERROR level logs from today
+	@if [ -f logs/bot_$$(date +%Y-%m-%d).log ]; then \
+		grep "ERROR" logs/bot_$$(date +%Y-%m-%d).log || echo "$(GREEN)No errors found!$(NC)"; \
+	else \
+		echo "$(YELLOW)No log file for today$(NC)"; \
+	fi
 
 desktop: ## Open desktop folder where Excel files are saved
 	@if [ -d "$$HOME/Desktop" ]; then \
