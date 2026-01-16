@@ -9,7 +9,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 from loguru import logger
-from config import DAYS_BACK, MAX_SCROLLS, THINKING_TIME_SCALE
+from config import HOURS_BACK, MAX_SCROLLS, THINKING_TIME_SCALE
 
 load_dotenv()
 
@@ -19,7 +19,7 @@ COOKIES_FILE = "cookies.json"
 class FacebookScraper:
     """Handles Facebook authentication and post scraping with human-like behavior."""
     
-    def __init__(self, days_back: int = DAYS_BACK, max_scrolls: int = MAX_SCROLLS, 
+    def __init__(self, hours_back: int = HOURS_BACK, max_scrolls: int = MAX_SCROLLS, 
                  thinking_time_scale: int = THINKING_TIME_SCALE):
         """
         Initialize Facebook scraper.
@@ -29,10 +29,9 @@ class FacebookScraper:
             max_scrolls: Maximum number of scrolls per group
             thinking_time_scale: 0-10 scale for thinking time (10=5s, 1=0.5s, 0=0s)
         """
-        self.days_back = days_back
         self.max_scrolls = max_scrolls
         self.thinking_time_scale = max(0, min(10, thinking_time_scale))
-        self.hours_back = days_back * 24
+        self.hours_back = hours_back
         
         self.playwright = None
         self.browser = None
@@ -60,13 +59,14 @@ class FacebookScraper:
     def parse_facebook_date(date_str: str) -> Optional[datetime]:
         """Parse Facebook date string to datetime object."""
         try:
-            # Remove time portion if present: "Thursday, January 15, 2026 at 9:42 PM" → "Thursday, January 15, 2026"
+            time_str = None
             if " at " in date_str:
-                date_str = date_str.split(" at ")[0]
-            elif " o " in date_str:  # Polish format
-                date_str = date_str.split(" o ")[0]
+                date_part, time_str = date_str.split(" at ")
+                date_str = date_part
+            elif " o " in date_str:
+                date_part, time_str = date_str.split(" o ")
+                date_str = date_part
             
-            # Remove day name if present: "Thursday, January 15, 2026" → "January 15, 2026"
             if "," in date_str:
                 date_str = ",".join(date_str.split(",")[1:]).strip()
             
@@ -79,26 +79,40 @@ class FacebookScraper:
                 "September": 9, "October": 10, "November": 11, "December": 12
             }
             
-            # Now we have: "January 15, 2026" or "15 stycznia 2026"
             parts = date_str.replace(",", "").split()
             
             if len(parts) < 3:
                 return None
             
-            # Detect format: English (Month Day Year) vs Polish (Day Month Year)
             first_part = parts[0]
-            if first_part in months:  # English: "January 15 2026"
+            if first_part in months:
                 month_name = parts[0]
                 day = int(parts[1])
                 year = int(parts[2])
-            else:  # Polish: "15 stycznia 2026"
+            else:
                 day = int(parts[0])
                 month_name = parts[1]
                 year = int(parts[2])
             
             month = months.get(month_name)
-            if month:
-                return datetime(year, month, day)
+            if not month:
+                return None
+            
+            hour, minute = 0, 0
+            if time_str:
+                time_match = re.search(r'(\d{1,2}):(\d{2})\s*(AM|PM)?', time_str, re.IGNORECASE)
+                if time_match:
+                    hour = int(time_match.group(1))
+                    minute = int(time_match.group(2))
+                    am_pm = time_match.group(3)
+                    
+                    if am_pm:
+                        if am_pm.upper() == 'PM' and hour != 12:
+                            hour += 12
+                        elif am_pm.upper() == 'AM' and hour == 12:
+                            hour = 0
+            
+            return datetime(year, month, day, hour, minute)
         except Exception as e:
             logger.debug(f"Failed to parse Facebook date '{date_str}': {e}")
         
@@ -323,16 +337,15 @@ class FacebookScraper:
             await self.random_delay(2, 4)
             post = posts[current_index]
             
-            
             try:
                 await post.scroll_into_view_if_needed(timeout=1000)
             except:
                 logger.debug("Failed to scroll to post, skipping")
-                input()
+                current_index += 1
                 continue              
             author_locator = post.locator('b').first
             try:
-                await author_locator.scroll_into_view_if_needed(timeout=000)
+                await author_locator.scroll_into_view_if_needed(timeout=1000)
                 await self.random_delay(1, 2)
             except:
                 logger.debug("Failed to scroll to author locator, skipping post")
@@ -368,7 +381,6 @@ class FacebookScraper:
                     has_day = re.search(r'\b\d{1,2}\b', tooltip_text) 
                     if has_time or has_day:
                         data_postu = tooltip_text
-                        is_recent = self.is_post_recent(data_postu)
                         logger.debug(f"Found tooltip with date/time: {tooltip_text}")
                         break
                     else:                    
@@ -376,6 +388,12 @@ class FacebookScraper:
                 except Exception as e:
                     logger.debug(f"Failed to hover or get tooltip: {str(e)}")
                     continue
+            
+            if data_postu:
+                is_recent = self.is_post_recent(data_postu)
+                if not is_recent:
+                    logger.debug(f"Post date {data_postu} is older than {self.hours_back} hours, stopping")
+                    break
                 
             await post.scroll_into_view_if_needed(timeout=5000)
             await self.random_delay(0.2, 0.5)
@@ -421,166 +439,6 @@ class FacebookScraper:
             })
         
         return dane_z_postu
-
-    async def _scrape_posts(self, group_id: str) -> List[Dict]:
-        """Scrape posts from a Facebook group."""
-        await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
-        await self.random_delay(3, 5)
-        await self.close_notification_popup()
-        
-        await self.random_mouse_movement()
-        await self.human_like_scroll()
-        
-        posts_data = []
-        should_continue = True
-        scroll_count = 0
-        no_new_posts_count = 0
-        
-        try:
-            await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=3000)
-        except Exception as e:
-            logger.debug(f"Timeout waiting for posts to load: {e}")
-        
-        await self.random_delay(2, 3)
-
-        posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
-        logger.debug(f"Found {len(posts)} total posts in DOM")
-
-            
-        for post in posts:
-            # try:
-            aria_pos = await post.get_attribute('aria-posinset')
-            #     post_element_id = f"{group_id}_pos_{aria_pos}"
-                
-            #     # Skip if already processed
-            #     if post_element_id in seen_ids:
-            #         continue
-                    
-            #     seen_ids.add(post_element_id)
-            # except:
-            #     continue
-            
-            # Small delay between checking posts
-            await self.random_delay(0.3, 0.8)
-                
-            try:
-                author_locator = post.locator('h2').first
-                await author_locator.scroll_into_view_if_needed(timeout=5000)
-                await self.random_delay(0.2, 0.5)
-                author_name = await author_locator.inner_text()
-            except Exception as e:
-                logger.debug(f"Failed to extract author name from post: {e}")
-                continue
-            
-            if "Anonymous" in author_name or "Anonimowy" in author_name:
-                logger.debug("Skipping anonymous post")
-                continue
-            
-            text_locator = post.locator('[data-ad-rendering-role="story_message"]')
-            if not await text_locator.count():
-                logger.debug("No text content found in post, skipping")
-                continue
-            
-            post_text = await text_locator.inner_text()
-            expand_name = "See more" if "See more" in post_text else "Zobacz więcej"
-            if expand_name.lower() in post_text.lower():
-                try:
-                    logger.debug("Expanding 'See more' content")
-                    see_more = post.locator(f'[role="button"]:has-text("{expand_name}")')
-                    await see_more.scroll_into_view_if_needed(timeout=3000)
-                    await self.random_delay(0.5, 1.2)
-                    await see_more.click(timeout=3000)
-                    await self.random_delay(0.8, 1.5)
-                    post_text = await text_locator.inner_text()
-                except Exception as e:
-                    logger.debug(f"Failed to click 'See more' button: {e}")
-            
-            try:
-                links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
-                participant_anchor_link = await links[0].get_attribute("href", timeout=5000)
-                participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
-            except Exception as e:
-                logger.debug(f"Failed to extract participant ID: {e}")
-                participant_id = "unknown"
-            
-            post_date = None
-            try:
-                candidates = links[3:5]
-                for date_link in candidates:
-                    await self.random_delay(0.3, 0.7)
-                    await date_link.hover()
-                    tooltip = self.page.locator('[role="tooltip"]')
-                    try:
-                        await tooltip.wait_for(state="visible", timeout=2000)
-                        post_date = await tooltip.inner_text()
-                        await self.random_delay(0.2, 0.5)
-                        break
-                    except Exception as e:
-                        logger.debug(f"Failed to get tooltip for date: {e}")
-                        continue
-            except Exception as e:
-                logger.debug(f"Failed to extract post date: {e}")
-            
-            if not self.is_post_recent(post_date):
-                logger.info(f"Reached posts older than {self.days_back} days, stopping...")
-                should_continue = False
-                break
-            
-            print(f"\n{'─'*80}")
-            print(f"📝 POST #{len(posts_data) + 1}")
-            print(f"👤 Author: {author_name}")
-            print(f"📅 Date: {post_date or 'N/A'}")
-            print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
-            print(f"{'─'*80}")
-            
-            posts_data.append({
-                "id": f"{group_id}_{participant_id}_{aria_pos}",
-                "author": author_name,
-                "user_id": participant_id,
-                "content": post_text,
-                "date": post_date,
-                "group_id": group_id
-            })
-            
-            if not should_continue:
-                break
-
-            if new_posts_found > 0:
-                no_new_posts_count = 0
-            else:
-                no_new_posts_count += 1
-                logger.debug(f"No new posts found, attempt {no_new_posts_count}/5")
-            
-            # Always scroll to trigger loading more posts
-            # Get current post count before scrolling
-            posts_count_before = len(posts)
-            
-            # Scroll to bottom of page (more reliable than scrolling to last element)
-            await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            logger.debug("Scrolled to bottom of page")
-            
-            # Wait for potential new posts to load
-            await self.random_delay(3, 5)
-            
-            # Check if new posts appeared in DOM
-            try:
-                await self.page.wait_for_function(
-                    f"document.querySelectorAll('[role=\"feed\"] [aria-posinset]').length > {posts_count_before}",
-                    timeout=5000
-                )
-                logger.debug("New posts detected in DOM")
-            except:
-                logger.debug("No new posts loaded after scroll")
-            
-            # If no new posts after 5 attempts, stop
-            if no_new_posts_count >= 5:
-                logger.info("No new posts found after 5 attempts, stopping")
-                break
-                
-            scroll_count += 1
-        
-        logger.info(f"Scraping complete: {len(posts_data)} total posts collected")
-        return posts_data
     
     async def save_cookies(self):
         """Save authentication cookies."""
