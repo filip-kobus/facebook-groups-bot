@@ -9,7 +9,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 from loguru import logger
-from config import HOURS_BACK, MAX_SCROLLS, THINKING_TIME_SCALE
+from config import HOURS_BACK, MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
 
 load_dotenv()
 
@@ -19,19 +19,13 @@ COOKIES_FILE = "cookies.json"
 class FacebookScraper:
     """Handles Facebook authentication and post scraping with human-like behavior."""
     
-    def __init__(self, hours_back: int = HOURS_BACK, max_scrolls: int = MAX_SCROLLS, 
-                 thinking_time_scale: int = THINKING_TIME_SCALE):
+    def __init__(self):
         """
         Initialize Facebook scraper.
-        
-        Args:
-            days_back: Number of days to look back for posts
-            max_scrolls: Maximum number of scrolls per group
-            thinking_time_scale: 0-10 scale for thinking time (10=5s, 1=0.5s, 0=0s)
         """
-        self.max_scrolls = max_scrolls
-        self.thinking_time_scale = max(0, min(10, thinking_time_scale))
-        self.hours_back = hours_back
+        self.max_posts_to_scan = MAX_POSTS_TO_SCAN
+        self.thinking_time_scale = max(0, min(10, THINKING_TIME_SCALE))
+        self.hours_back = HOURS_BACK
         
         self.playwright = None
         self.browser = None
@@ -322,6 +316,7 @@ class FacebookScraper:
         number_of_posts = len(posts)
         logger.debug(f"Found {number_of_posts} total posts in DOM")
         current_index = 0
+        scraped_posts = 0
         data_postu = None
         dane_z_postu = []
 
@@ -431,6 +426,11 @@ class FacebookScraper:
             print(f"👤 Author: {author_name}")
             print(f"📅 Date: {data_postu or 'N/A'}")
             print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
+
+            scraped_posts += 1
+            if scraped_posts >= self.max_posts_to_scan:
+                logger.debug(f"Reached max posts to scan: {self.max_posts_to_scan}, stopping")
+                break
 
             dane_z_postu.append({
                 "id": f"{group_id}_{participant_id}_{current_index}",
