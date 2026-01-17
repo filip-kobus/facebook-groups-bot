@@ -29,10 +29,7 @@ logger.add(
 )
 
 async def main():
-    """Main entry point for the Facebook groups lead scraper."""
-    logger.info("Starting Facebook Groups Lead Scraper")
-    logger.info(f"Thinking time scale: {THINKING_TIME_SCALE}")
-    
+    """Main entry point for the Facebook groups lead scraper."""  
     scraper = None
     try:
         scraper = FacebookScraper(thinking_time_scale=THINKING_TIME_SCALE)
