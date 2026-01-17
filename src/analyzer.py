@@ -22,29 +22,34 @@ class LeadAnalyzer:
 Jesteś ekspertem ds. analizy leadów leasingowych. Twoim zadaniem jest filtrowanie postów z Facebooka.
 Otrzymasz listę postów. Dla każdego z nich musisz zdecydować, czy autor jest potencjalnym klientem szukającym finansowania (leasingu/pożyczki).
 
-ZASADY FILTROWANIA:
+KLUCZOWE ZASADY (BARDZO WAŻNE):
+Szukamy TYLKO osób, które CHCĄ KUPIĆ/WZIĄĆ leasing. Eliminujemy sprzedawców i pośredników.
 
-Oznacz jako TRUE (is_lead=True), jeśli post zawiera intencję uzyskania oferty lub finansowania, np.:
-- Autor prosi o przygotowanie oferty lub kalkulacji ("przygotuję ofertę", "wykona kalkulację").
-- Autor pyta o rabaty ("Jaki rabat", "Ile rabatu").
-- Autor wprost pisze, że szuka ("Szukam leasingu", "Szukam oferty", "poszukuje pożyczki").
-- Autor prosi o ocenę oferty ("Czy to jest dobra oferta", "lepszą ofertę").
-- Autor pyta o warunki ("warunków leasingu", "w leasingu").
+Oznacz jako TRUE (is_lead=True), tylko jeśli autor SZUKA finansowania:
+- Pisze "Szukam leasingu", "Szukam oferty na...", "Poproszę o ofertę".
+- Pyta o warunki ("Jaki procent", "Ile wpłaty", "Czy dostanę leasing").
+- Prosi o wyliczenie raty.
+- Szuka samochodu i pyta o możliwości finansowania.
 
-Oznacz jako FALSE (is_lead=False), jeśli post dotyczy rynku wtórnego, przejęć lub sprzedaży, np.:
-- Słowa kluczowe związane z cesją: "cesja", "odstąpię", "przejmę", "do przejęcia", "bez odstępnego".
-- Słowa kluczowe związane z najmem/braniem: "najem długotrwały", "wezmę", "przyjmę".
-- Słowa kluczowe sprzedażowe: "na sprzedaż", "oddać".
+Oznacz jako FALSE (is_lead=False) w każdym innym przypadku, SZCZEGÓLNIE GDY:
+1. Autor OFERUJE leasing/finansowanie (np. "Chętnie pomogę", "Zapraszam do kontaktu", "Oferuję leasing", "Jestem doradcą", "Finansowanie bez BIK").
+2. Autor OFERUJE pracę lub szuka kierowców (np. "Szukam kierowcy", "Zatrudnię na taxi", "Podepnę pod flotę").
+3. Autor WYNAJMUJE auta (np. "Wynajmę auto pod taxi", "Auto do wynajęcia", "Wynajem krótko/długoterminowy").
+4. Autor CHCE SPRZEDAĆ auto lub ODSTĄPIĆ leasing (cesja, "odstąpię", "sprzedam").
+5. Autor to dealer lub komis samochodowy reklamujący swoje auta ("Dostępny od ręki", "Zapraszamy do salonu").
 
-UWAGA: Bądź precyzyjny. Jeśli ktoś pisze "Odstąpię leasing", to NIE jest Twój klient (szukasz osób, które chcą wziąć nowy leasing, a nie pozbyć się starego).
+PAMIĘTAJ:
+- "Kto zrobi leasing?" -> TRUE (potencjalny klient)
+- "Zrobię leasing" -> FALSE (konkurencja)
+- "Szukam kierowców na auta firmowe" -> FALSE (rekrutacja/wynajem)
 """
     
-    def __init__(self, model: str = 'openai:gpt-4o-mini', batch_size: int = 5):
+    def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 3):
         """
         Initialize the lead analyzer.
         
         Args:
-            model: AI model to use for analysis
+            model: AI model to use for analysis (default: gpt-4o for better accuracy)
             batch_size: Number of posts to analyze in each batch
         """
         self.batch_size = batch_size

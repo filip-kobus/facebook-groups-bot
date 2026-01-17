@@ -35,25 +35,19 @@ async def main():
     
     scraper = None
     try:
-        # Initialize components
         scraper = FacebookScraper(thinking_time_scale=THINKING_TIME_SCALE)
-        await scraper.init_browser()
-        await scraper.scrape_posts("leasingikredytsamochodowywpolsce")
-        # analyzer = LeadAnalyzer(batch_size=5)
-        # exporter = ExcelExporter()  # Auto-detects desktop path
+        analyzer = LeadAnalyzer(batch_size=5)
+        exporter = ExcelExporter()
         
-        # # Create processor
-        # processor = GroupProcessor(scraper, analyzer, exporter)
+        processor = GroupProcessor(scraper, analyzer, exporter)
         
-        # # Process all groups
-        # await processor.process_all_groups(groups_ids)
+        await processor.process_all_groups(groups_ids)
         
-        # logger.success("All groups processed successfully!")
+        logger.success("All groups processed successfully!")
     except Exception as e:
         logger.exception(f"Fatal error in main execution: {e}")
         raise
     finally:
-        # Always cleanup browser resources before event loop closes
         if scraper:
             await scraper.cleanup()
             logger.debug("Browser cleanup completed")

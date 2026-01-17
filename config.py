@@ -1,4 +1,4 @@
-HOURS_BACK = 3
+HOURS_BACK = 10
 MAX_SCROLLS = 20
 
 # Thinking time scale (0-10):

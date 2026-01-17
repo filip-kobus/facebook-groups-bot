@@ -45,14 +45,15 @@ class ExcelExporter:
     def _generate_filename(self) -> str:
         """Generate filename with current date."""
         current_date = datetime.now().strftime("%Y-%m-%d")
-        return f"leads_{current_date}.xlsx"
+        return f"analyzed_posts_{current_date}.xlsx"
     
-    def export_to_excel(self, posts: List[Dict]) -> str:
+    def export_to_excel(self, posts: List[Dict], append: bool = False) -> str:
         """
         Export posts to Excel file on desktop.
         
         Args:
             posts: List of post dictionaries to export
+            append: If True, append to existing file instead of overwriting
             
         Returns:
             Path to the created Excel file
@@ -61,18 +62,30 @@ class ExcelExporter:
             print("No posts to export")
             return None
         
-        # Create DataFrame
-        df = pd.DataFrame(posts)
-        
         # Generate full file path
         filename = self._generate_filename()
         file_path = os.path.join(self.desktop_path, filename)
         
+        # Create DataFrame from new posts
+        df_new = pd.DataFrame(posts)
+        
+        # If append mode and file exists, read existing data and append
+        if append and os.path.exists(file_path):
+            try:
+                df_existing = pd.read_excel(file_path, engine='openpyxl')
+                df = pd.concat([df_existing, df_new], ignore_index=True)
+                print(f"📝 Appending {len(posts)} leads to existing file")
+            except Exception as e:
+                print(f"⚠️  Could not read existing file, creating new: {e}")
+                df = df_new
+        else:
+            df = df_new
+        
         # Export to Excel
         df.to_excel(file_path, index=False, engine='openpyxl')
         
-        print(f"\n✅ Leads exported to: {file_path}")
-        print(f"📊 Total leads exported: {len(posts)}")
+        print(f"✅ Leads exported to: {file_path}")
+        print(f"📊 Total leads in file: {len(df)}")
         
         return file_path
     

@@ -30,7 +30,7 @@ class GroupProcessor:
     
     async def random_delay_between_groups(self):
         """Random delay between processing groups."""
-        delay = random.uniform(30, 60)
+        delay = random.uniform(5, 15)
         print(f"Waiting {delay:.1f} seconds before next group...")
         await asyncio.sleep(delay)
     
@@ -50,7 +50,7 @@ class GroupProcessor:
         
         # Scrape posts
         posts = await self.scraper.scrape_posts(group_id)
-        print(f"\nScraped {len(posts)} posts from last {self.scraper.days_back} days")
+        print(f"\nScraped {len(posts)} posts from last {self.scraper.hours_back} hours")
         
         # Analyze posts in batches
         all_analyzed_posts = []
@@ -68,6 +68,10 @@ class GroupProcessor:
         
         total_leads = sum(1 for p in all_analyzed_posts if p["is_lead"])
         print(f"\nGroup {group_id} complete: {total_leads}/{len(all_analyzed_posts)} total leads")
+        
+        # Export all analyzed posts from this group immediately (for later review)
+        if all_analyzed_posts:
+            self.exporter.export_to_excel(all_analyzed_posts, append=True)
         
         return all_analyzed_posts
     
@@ -93,14 +97,13 @@ class GroupProcessor:
                     print(f"Error processing group {group_id}: {e}")
                     continue
             
-            # Export all leads to Excel
-            leads = [post for post in self.all_posts if post.get("is_lead", False)]
-            if leads:
-                self.exporter.export_to_excel(leads)
+            # Summary
+            total_leads = sum(1 for p in self.all_posts if p.get("is_lead", False))
+            if total_leads > 0:
+                print(f"\n✅ All groups processed successfully")
+                print(f"📊 Total leads found: {total_leads}")
             else:
-                print("\n⚠️  No leads found to export")
-            
-            print("\n✅ All groups processed successfully")
+                print("\n⚠️  No leads found across all groups")
             
         finally:
             # Cleanup

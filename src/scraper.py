@@ -338,6 +338,7 @@ class FacebookScraper:
             post = posts[current_index]
             
             try:
+                await post.is_visible(timeout=1000)
                 await post.scroll_into_view_if_needed(timeout=1000)
             except:
                 logger.debug("Failed to scroll to post, skipping")
@@ -346,22 +347,23 @@ class FacebookScraper:
             author_locator = post.locator('b').first
             try:
                 await author_locator.scroll_into_view_if_needed(timeout=1000)
+                await author_locator.is_visible(timeout=1000)
                 await self.random_delay(1, 2)
-            except:
-                logger.debug("Failed to scroll to author locator, skipping post")
+                author_name = await author_locator.inner_text(timeout=1000)
+            except Exception as e:
+                logger.debug(f"Failed to extract author name: {e}, skipping post")
                 current_index += 1
                 continue
-            author_name = await author_locator.inner_text()
 
             if "Anonymous" in author_name or "Anonimowy" in author_name:
                 logger.debug("Skipping anonymous post")
                 current_index += 1
                 continue
 
+            await author_locator.scroll_into_view_if_needed(timeout=1000)
             available_links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
-            await author_locator.scroll_into_view_if_needed(timeout=5000)
             await self.random_delay(0.2, 0.5)
-            participant_anchor_link = await available_links[0].get_attribute("href", timeout=5000)
+            participant_anchor_link = await available_links[0].get_attribute("href", timeout=1000)
             participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
 
             for link in available_links[1:5]:
@@ -369,9 +371,9 @@ class FacebookScraper:
                     if not await link.is_visible():
                         continue
                     
-                    await link.scroll_into_view_if_needed(timeout=2000)
+                    await link.scroll_into_view_if_needed(timeout=1000)
                     await self.random_delay(1.3, 1.7)
-                    await link.hover(timeout=5000)
+                    await link.hover(timeout=1000)
                     
                     tooltip = self.page.locator('[role="tooltip"]')
                     tooltip_text = await tooltip.inner_text(timeout=1000)
@@ -395,13 +397,14 @@ class FacebookScraper:
                     logger.debug(f"Post date {data_postu} is older than {self.hours_back} hours, stopping")
                     break
                 
-            await post.scroll_into_view_if_needed(timeout=5000)
+            await post.scroll_into_view_if_needed(timeout=1000)
             await self.random_delay(0.2, 0.5)
             logger.debug(f"Processing initial post at index {current_index}")
             
             text_locator = post.locator('[data-ad-rendering-role="story_message"]')
             if not await text_locator.count():
                 logger.debug("No text content found in post, skipping")
+                current_index += 1
                 continue
             
             post_text = await text_locator.first.inner_text()
@@ -411,7 +414,7 @@ class FacebookScraper:
                 try:
                     logger.debug("Expanding 'See more' content")
                     see_more = post.locator(f'[role="button"]:has-text("{expand_name}")')
-                    await see_more.scroll_into_view_if_needed(timeout=3000)
+                    await see_more.scroll_into_view_if_needed(timeout=1000)
                     await self.random_delay(0.5, 1.2)
                     await see_more.click(timeout=3000)
                     await self.random_delay(0.8, 1.5)
