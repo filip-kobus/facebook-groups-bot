@@ -5,7 +5,6 @@ from src.analyzer import LeadAnalyzer
 from src.excel_exporter import ExcelExporter
 from src.group_processor import GroupProcessor
 from src.groups import groups_ids
-from config import THINKING_TIME_SCALE
 
 
 # Configure loguru
@@ -32,8 +31,8 @@ async def main():
     """Main entry point for the Facebook groups lead scraper."""  
     scraper = None
     try:
-        scraper = FacebookScraper(thinking_time_scale=THINKING_TIME_SCALE)
-        analyzer = LeadAnalyzer(batch_size=5)
+        scraper = FacebookScraper()
+        analyzer = LeadAnalyzer(batch_size=10)
         exporter = ExcelExporter()
         
         processor = GroupProcessor(scraper, analyzer, exporter)

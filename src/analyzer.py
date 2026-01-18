@@ -7,7 +7,7 @@ class PostAnalysis(BaseModel):
     """Schema for post analysis results."""
     post_id: str = Field(description="Identyfikator analizowanego posta")
     is_lead: bool = Field(description="True jeśli autor szuka finansowania, False jeśli to reklama, cesja lub sprzedaż")
-    reasoning: str = Field(description="Krótkie uzasadnienie decyzji")
+    # reasoning: str = Field(description="Krótkie uzasadnienie decyzji")
 
 
 class BatchAnalysisResult(BaseModel):
@@ -23,7 +23,7 @@ Jesteś ekspertem ds. analizy leadów leasingowych. Twoim zadaniem jest filtrowa
 Otrzymasz listę postów. Dla każdego z nich musisz zdecydować, czy autor jest potencjalnym klientem szukającym finansowania (leasingu/pożyczki).
 
 KLUCZOWE ZASADY (BARDZO WAŻNE):
-Szukamy TYLKO osób, które CHCĄ KUPIĆ/WZIĄĆ leasing. Eliminujemy sprzedawców i pośredników.
+Szukamy TYLKO osób, które CHCĄ KUPIĆ/WZIĄĆ leasing (NIE PRZEJĄĆ!!!). Eliminujemy sprzedawców i pośredników.
 
 Oznacz jako TRUE (is_lead=True), tylko jeśli autor SZUKA finansowania:
 - Pisze "Szukam leasingu", "Szukam oferty na...", "Poproszę o ofertę".
@@ -36,7 +36,8 @@ Oznacz jako FALSE (is_lead=False) w każdym innym przypadku, SZCZEGÓLNIE GDY:
 2. Autor OFERUJE pracę lub szuka kierowców (np. "Szukam kierowcy", "Zatrudnię na taxi", "Podepnę pod flotę").
 3. Autor WYNAJMUJE auta (np. "Wynajmę auto pod taxi", "Auto do wynajęcia", "Wynajem krótko/długoterminowy").
 4. Autor CHCE SPRZEDAĆ auto lub ODSTĄPIĆ leasing (cesja, "odstąpię", "sprzedam").
-5. Autor to dealer lub komis samochodowy reklamujący swoje auta ("Dostępny od ręki", "Zapraszamy do salonu").
+5. Autor CHCE PRZEJĄĆ leasing na inną firmę (cesja, "przejmę leasing", "wezmę od kogoś leasing").
+6. Autor to dealer lub komis samochodowy reklamujący swoje auta ("Dostępny od ręki", "Zapraszamy do salonu").
 
 PAMIĘTAJ:
 - "Kto zrobi leasing?" -> TRUE (potencjalny klient)
@@ -44,7 +45,7 @@ PAMIĘTAJ:
 - "Szukam kierowców na auta firmowe" -> FALSE (rekrutacja/wynajem)
 """
     
-    def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 3):
+    def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 5):
         """
         Initialize the lead analyzer.
         
@@ -72,7 +73,7 @@ PAMIĘTAJ:
         if not posts:
             return []
         
-        posts_for_analysis = [{"id": p["id"], "content": p["content"]} for p in posts]
+        posts_for_analysis = [{"id": p["id"], "content": p["content"][:300]} for p in posts]
         input_text = f"Przeanalizuj poniższe posty:\n{str(posts_for_analysis)}"
         
         result = await self.agent.run(input_text)
@@ -85,7 +86,7 @@ PAMIĘTAJ:
             enriched_posts.append({
                 **post,
                 "is_lead": analysis.is_lead if analysis else False,
-                "reasoning": analysis.reasoning if analysis else "No analysis"
+                # "reasoning": analysis.reasoning if analysis else "No analysis"
             })
         
         return enriched_posts

@@ -319,9 +319,10 @@ class FacebookScraper:
         scraped_posts = 0
         data_postu = None
         dane_z_postu = []
+        old_posts_streak = 0
 
         is_recent = self.is_post_recent(data_postu)
-        while is_recent:
+        while is_recent or old_posts_streak < 3:
             if current_index >= number_of_posts - 2:
                 await self.human_like_scroll()
                 await self.random_delay(1, 2)
@@ -366,7 +367,7 @@ class FacebookScraper:
                     if not await link.is_visible():
                         continue
                     
-                    await link.scroll_into_view_if_needed(timeout=1000)
+                    # await link.scroll_into_view_if_needed(timeout=1000)
                     await self.random_delay(1.3, 1.7)
                     await link.hover(timeout=1000)
                     
@@ -389,8 +390,15 @@ class FacebookScraper:
             if data_postu:
                 is_recent = self.is_post_recent(data_postu)
                 if not is_recent:
-                    logger.debug(f"Post date {data_postu} is older than {self.hours_back} hours, stopping")
-                    break
+                    old_posts_streak += 1
+                    logger.debug(f"Post date {data_postu} is older than {self.hours_back} hours, streak: {old_posts_streak}/3")
+                    if old_posts_streak >= 3:
+                        logger.debug(f"Found 3 old posts in a row, stopping")
+                        break
+                    current_index += 1
+                    continue
+                else:
+                    old_posts_streak = 0
                 
             await post.scroll_into_view_if_needed(timeout=1000)
             await self.random_delay(0.2, 0.5)
