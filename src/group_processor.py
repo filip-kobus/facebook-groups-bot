@@ -3,6 +3,7 @@ import random
 from typing import List, Dict
 from src.scraper import FacebookScraper
 from src.analyzer import LeadAnalyzer
+from src.chatbot import Chatbot
 from src.excel_exporter import ExcelExporter
 
 
@@ -13,7 +14,8 @@ class GroupProcessor:
         self,
         scraper: FacebookScraper,
         analyzer: LeadAnalyzer,
-        exporter: ExcelExporter
+        exporter: ExcelExporter,
+        chatbot: Chatbot,
     ):
         """
         Initialize the group processor.
@@ -26,6 +28,7 @@ class GroupProcessor:
         self.scraper = scraper
         self.analyzer = analyzer
         self.exporter = exporter
+        self.chatbot = chatbot
         self.all_posts = []
     
     async def random_delay_between_groups(self):
@@ -58,6 +61,7 @@ class GroupProcessor:
         for i, batch in enumerate(self.analyzer.batch_posts(posts), 1):
             print(f"Analyzing batch {i} ({len(batch)} posts)...")
             analyzed = await self.analyzer.analyze_posts_batch(batch)
+            await self.send_message_to_leads([p for p in analyzed if p["is_lead"]])
             all_analyzed_posts.extend(analyzed)
             
             leads_count = sum(1 for p in analyzed if p["is_lead"])
@@ -75,6 +79,33 @@ class GroupProcessor:
         
         return all_analyzed_posts
     
+    async def send_message_to_leads(self, lead_posts: List[Dict]):
+        """
+        Send a message to a lead via Facebook Messenger.
+        
+        Args:
+            lead_post: Dictionary containing lead post information
+            message: Message content to send
+        """
+        # TODO
+        # currently sending test message to: 61585106213741
+        print(f"\nSending messages to {len(lead_posts)} leads...")
+        TEST_RECIPIENT_ID = "61585106213741"
+        for lead_post in lead_posts:
+            message = await self.chatbot.suggest_message(lead_post.get("author"), lead_post)
+            author_id = lead_post.get("user_id")
+            if not author_id:
+                print(f"Cannot send message, no author_id found for post {lead_post.get('id')}")
+                return
+            messages_to_send = [
+                f"Wiadomość do leada https://www.facebook.com/{author_id}",
+                f"Treść posta: \n{lead_post.get('content')}",
+                f"Treść wiadomości: \n{message}",
+                "---",
+            ]
+            await self.scraper.send_messages(TEST_RECIPIENT_ID, messages_to_send)
+            print(f"Message sent to lead {TEST_RECIPIENT_ID}.")
+
     async def process_all_groups(self, group_ids: List[str]):
         """
         Process all groups and export leads at the end.

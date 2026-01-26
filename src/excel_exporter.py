@@ -62,6 +62,8 @@ class ExcelExporter:
             print("No posts to export")
             return None
         
+        posts = [post for post in posts if post.get("is_lead", False)]
+
         # Generate full file path
         filename = self._generate_filename()
         file_path = os.path.join(self.desktop_path, filename)

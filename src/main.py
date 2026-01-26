@@ -1,10 +1,12 @@
 import asyncio
 from loguru import logger
+from src.chatbot import Chatbot
 from src.scraper import FacebookScraper
 from src.analyzer import LeadAnalyzer
 from src.excel_exporter import ExcelExporter
 from src.group_processor import GroupProcessor
 from src.groups import groups_ids
+from src.messages import STARTING_MESSAGE, STARTING_MESSAGE_WHEN_PARAMS_GIVEN
 
 
 # Configure loguru
@@ -34,11 +36,12 @@ async def main():
         scraper = FacebookScraper()
         analyzer = LeadAnalyzer(batch_size=10)
         exporter = ExcelExporter()
+        chatbot = Chatbot()
         
-        processor = GroupProcessor(scraper, analyzer, exporter)
-        
+        processor = GroupProcessor(scraper, analyzer, exporter, chatbot)
+        # Initialize browser before sending messages
         await processor.process_all_groups(groups_ids)
-        
+
         logger.success("All groups processed successfully!")
     except Exception as e:
         logger.exception(f"Fatal error in main execution: {e}")

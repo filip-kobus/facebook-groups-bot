@@ -287,6 +287,72 @@ class FacebookScraper:
         
         return self.playwright, self.browser, self.context, self.page
 
+    async def get_message_box(self, user_id: str):
+        """Open Facebook Messenger."""
+        await self.page.goto(f"https://www.facebook.com//{user_id}")
+        await self.random_delay(2, 4)
+
+        # Delikatny scroll i ruch myszką do przycisku "Message"
+        try:
+            await self.page.get_by_label("Close").click()
+            await self.random_delay(1, 2)
+        except Exception as e:
+            pass
+        await self.page.mouse.move(200, 300)
+        await self.random_delay(0.2, 0.5)
+        await self.page.mouse.move(400, 350)
+        await self.random_delay(0.2, 0.5)
+        await self.page.mouse.wheel(0, 150)
+        await self.random_delay(0.2, 0.5)
+
+        await self.page.get_by_text("Message", exact=True).scroll_into_view_if_needed(timeout=2000)
+        await self.random_delay(0.2, 0.5)
+        await self.page.get_by_text("Message", exact=True).hover()
+        await self.random_delay(0.2, 0.5)
+        await self.page.get_by_text("Message", exact=True).click()
+        
+        await self.random_delay(1, 2)
+
+        # Delikatny scroll i ruch myszką do pola tekstowego
+        message_box = self.page.locator('div[role="textbox"][aria-label="Message"]')
+        await message_box.scroll_into_view_if_needed(timeout=2000)
+        await self.random_delay(0.2, 0.5)
+        box_rect = await message_box.bounding_box()
+        if box_rect:
+            await self.page.mouse.move(box_rect["x"] + 10, box_rect["y"] + 10)
+            await self.random_delay(0.2, 0.5)
+        await message_box.click()
+        
+        await self.random_delay(1, 2)
+        
+        return message_box
+
+    async def send_messages(self, user_id: str, messages: List[str]) -> bool:
+        """Send multiple messages to a user."""
+        message_box = await self.get_message_box(user_id)
+        for message in messages:
+            success = await self.send_message(message_box, message)
+            if not success:
+                return False
+            await self.random_delay(1, 3)
+        return True
+
+    async def send_message(self, message_box, message: str) -> bool:
+        """Send a message to a user."""
+        for char in message:
+            if char == "\n":
+                await message_box.press("Shift+Enter")
+                await self.random_delay(0.1, 0.3)
+            else:
+                await message_box.type(char, delay=random.randint(50, 150))
+
+        
+        await self.random_delay(1, 2)
+        await message_box.press("Enter")
+        await self.random_delay(2, 3)
+        
+        return True
+
     async def is_x_hours_older(self, post_date_str: str, hours: int) -> bool:
         """Check if post is older than specified hours."""
         if not post_date_str:

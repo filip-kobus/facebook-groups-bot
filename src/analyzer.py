@@ -7,6 +7,7 @@ class PostAnalysis(BaseModel):
     """Schema for post analysis results."""
     post_id: str = Field(description="Identyfikator analizowanego posta")
     is_lead: bool = Field(description="True jeśli autor szuka finansowania, False jeśli to reklama, cesja lub sprzedaż")
+    has_unseen_info: bool = Field(default=False, description="True jeśli istotne informacje są prawdopodobnie w załączniku którego nie ma w podanej treści posta")
     # reasoning: str = Field(description="Krótkie uzasadnienie decyzji")
 
 
@@ -14,35 +15,35 @@ class BatchAnalysisResult(BaseModel):
     """Schema for batch analysis results."""
     results: List[PostAnalysis]
 
-
 class LeadAnalyzer:
     """Handles AI-based analysis of posts to identify leads."""
     
     SYSTEM_PROMPT = """
-Jesteś ekspertem ds. analizy leadów leasingowych. Twoim zadaniem jest filtrowanie postów z Facebooka.
-Otrzymasz listę postów. Dla każdego z nich musisz zdecydować, czy autor jest potencjalnym klientem szukającym finansowania (leasingu/pożyczki).
+Jesteś ekspertem ds. analizy leadów leasingowych. Otrzymujesz listę postów z Facebooka. Dla każdego:
 
-KLUCZOWE ZASADY (BARDZO WAŻNE):
-Szukamy TYLKO osób, które CHCĄ KUPIĆ/WZIĄĆ leasing (NIE PRZEJĄĆ!!!). Eliminujemy sprzedawców i pośredników.
+Oznacz jako is_lead=True tylko jeśli autor SZUKA finansowania/leasingu na firmę (np. "Szukam leasingu", "Poproszę o ofertę", "Ile wpłaty?", "Wyliczenie raty", "Potrzebuję finansowania"). Szukamy wartościowych leadów gdzie klient jest zdecydowany, ma firmę oraz nie posiada brudów w biku albo w bazie, chcemy tylko pewne leady.
 
-Oznacz jako TRUE (is_lead=True), tylko jeśli autor SZUKA finansowania:
-- Pisze "Szukam leasingu", "Szukam oferty na...", "Poproszę o ofertę".
-- Pyta o warunki ("Jaki procent", "Ile wpłaty", "Czy dostanę leasing").
-- Prosi o wyliczenie raty.
-- Szuka samochodu i pyta o możliwości finansowania.
+Oznacz jako is_lead=False jeśli:
+- Autor oferuje leasing/finansowanie (np. "Oferuję leasing", "Chętnie pomogę", "Jestem doradcą", "Finansowanie bez BIK"),
+- Jeśli szuka auta i leasingu (WYJĄTEK JEŚLI TO BMW, JEŚLI SZUKA BMW W LESAING TO TRUE)
+- Chce leasing na osobę prywatną, konsumencki ("Leasing dla osoby prywatnej", "Konsumencki"),
+- Jeśli leasing jest jedną z opcji (szukam najmu lub leasingu)
+- Szuka pracy/kierowców ("Szukam kierowcy", "Zatrudnię na taxi"),
+- Wynajmuje auta ("Wynajmę auto pod taxi"),
+- Chce sprzedać/odstąpić/przejąć leasing (cesja, "odstąpię", "przejmę leasing"),
+- Jest dealerem/komisem ("Dostępny od ręki", "Zapraszamy do salonu"),
+- Chce leasing na osobę prywatną,
+- Chce leasing bez weryfikacji baz/BIK.
 
-Oznacz jako FALSE (is_lead=False) w każdym innym przypadku, SZCZEGÓLNIE GDY:
-1. Autor OFERUJE leasing/finansowanie (np. "Chętnie pomogę", "Zapraszam do kontaktu", "Oferuję leasing", "Jestem doradcą", "Finansowanie bez BIK").
-2. Autor OFERUJE pracę lub szuka kierowców (np. "Szukam kierowcy", "Zatrudnię na taxi", "Podepnę pod flotę").
-3. Autor WYNAJMUJE auta (np. "Wynajmę auto pod taxi", "Auto do wynajęcia", "Wynajem krótko/długoterminowy").
-4. Autor CHCE SPRZEDAĆ auto lub ODSTĄPIĆ leasing (cesja, "odstąpię", "sprzedam").
-5. Autor CHCE PRZEJĄĆ leasing na inną firmę (cesja, "przejmę leasing", "wezmę od kogoś leasing").
-6. Autor to dealer lub komis samochodowy reklamujący swoje auta ("Dostępny od ręki", "Zapraszamy do salonu").
+Przykłady:
+- "Kto zrobi leasing?" -> TRUE
+- "Zrobię leasing" -> FALSE
+- "Szukam kierowców na auta firmowe" -> FALSE
 
-PAMIĘTAJ:
-- "Kto zrobi leasing?" -> TRUE (potencjalny klient)
-- "Zrobię leasing" -> FALSE (konkurencja)
-- "Szukam kierowców na auta firmowe" -> FALSE (rekrutacja/wynajem)
+---
+
+**WAŻNE: has_unseen_info**
+Jeśli w treści posta jest odniesienie do brakującego załącznika (np. "szczegóły na zdjęciu", "kalkulacja w załączniku"), ustaw has_unseen_info=True. W przeciwnym razie ustaw has_unseen_info=False. To pole jest opcjonalne i powinno być True tylko wtedy, gdy tekst sugeruje brakujące istotne informacje w załączniku.
 """
     
     def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 5):
