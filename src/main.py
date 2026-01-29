@@ -1,12 +1,11 @@
 import asyncio
 from loguru import logger
-from src.chatbot import Chatbot
-from src.scraper import FacebookScraper
-from src.analyzer import LeadAnalyzer
-from src.excel_exporter import ExcelExporter
-from src.group_processor import GroupProcessor
-from src.groups import groups_ids
-from src.messages import STARTING_MESSAGE, STARTING_MESSAGE_WHEN_PARAMS_GIVEN
+from chatbot import Chatbot
+from scraper import FacebookScraper
+from analyzer import LeadAnalyzer
+from group_processor import GroupProcessor
+from groups import groups_ids
+from messages import STARTING_MESSAGE, STARTING_MESSAGE_WHEN_PARAMS_GIVEN
 
 
 # Configure loguru

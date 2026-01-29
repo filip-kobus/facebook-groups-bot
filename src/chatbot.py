@@ -34,7 +34,8 @@ class Chatbot:
 
 "Witam Panie/Pani --imie--,
 
-Kontaktuję się z Alior Leasing w celu zaproponowania oferty na finansowanie pojazdu.
+Jestem doradcą ds. finansowania w Alior Leasing.
+Kontaktuję się w celu zaproponowania oferty na finansowanie pojazdu.
 Z postu wiem, że rata wynosi x, okres xy, natomiast będę jeszcze potrzebował z, k, m
 Dodatkowo będę potrzebował NIPu oraz adresu mailowego - do przesłania kalkulacji.
 
@@ -42,7 +43,10 @@ Pozdrawiam :)"
 
 ### WAŻNE!!!
 
-Jeśli w treści posta nie ma podanych informacji to nie piszesz co wiesz z ogłoszenia.
+- Jeśli w treści posta nie ma podanych informacji to nie piszesz co wiesz z ogłoszenia.
+- Autor nie kontaktował się wcześniej - nie nawiązujesz do wcześniejszej rozmowy.
+- Trzymaj się powyższego przykładu, nie dodawaj nic więcej ani nic mniej jeśli nie ma takiej potrzeby.
+- Nie powtarzaj informacji z posta jeśli nie są potrzebne do wiadomości. Tylko rzeczy niezbędne do przygotowania oferty.
 """
 
     def __init__(self, model: str = 'openai:gpt-4.1'):

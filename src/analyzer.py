@@ -25,7 +25,8 @@ Oznacz jako is_lead=True tylko jeśli autor SZUKA finansowania/leasingu na firm�
 
 Oznacz jako is_lead=False jeśli:
 - Autor oferuje leasing/finansowanie (np. "Oferuję leasing", "Chętnie pomogę", "Jestem doradcą", "Finansowanie bez BIK"),
-- Jeśli szuka auta i leasingu (WYJĄTEK JEŚLI TO BMW, JEŚLI SZUKA BMW W LESAING TO TRUE)
+- Jeśli szuka auta i leasingu - szukam auta w najmie
+- Jeśli szuka auta do kupna i później finansowania (np. "Kupię auto i wezmę leasing") - chcemy tylko finansowanie/leasing, bez szukania auta lub przedmiotu do leasingu (chyba że chodzi o BWM)
 - Chce leasing na osobę prywatną, konsumencki ("Leasing dla osoby prywatnej", "Konsumencki"),
 - Jeśli leasing jest jedną z opcji (szukam najmu lub leasingu)
 - Szuka pracy/kierowców ("Szukam kierowcy", "Zatrudnię na taxi"),

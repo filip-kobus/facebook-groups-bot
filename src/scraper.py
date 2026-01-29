@@ -248,9 +248,12 @@ class FacebookScraper:
                 '--disable-setuid-sandbox',
                 '--disable-web-security',
                 '--disable-features=IsolateOrigins,site-per-process'
-            ]
+            ],
+            user_data_dir="./user_data"
         )
         
+        self.context = self.browser.new_context()
+        await self.context.storage_state(path="state.json")
         is_auth = self.is_authenticated()
         
         context_options = {
@@ -278,13 +281,13 @@ class FacebookScraper:
         """)
         
         self.page = await self.context.new_page()
-        
         if not is_auth:
             await self.login()
             await self.confirm_cookies()
-            await self.save_cookies()
             logger.info("Cookies saved after login")
         
+        await self.save_cookies()
+        input()
         return self.playwright, self.browser, self.context, self.page
 
     async def get_message_box(self, user_id: str):
@@ -294,8 +297,10 @@ class FacebookScraper:
 
         # Delikatny scroll i ruch myszką do przycisku "Message"
         try:
-            await self.page.get_by_label("Close").click()
-            await self.random_delay(1, 2)
+            close_buttons = self.page.locator('[aria-label*="Close" i]')
+            if await close_buttons.count() > 0:
+                await close_buttons.first.click()
+                await self.random_delay(1, 2)
         except Exception as e:
             pass
         await self.page.mouse.move(200, 300)
@@ -507,7 +512,7 @@ class FacebookScraper:
                 break
 
             dane_z_postu.append({
-                "id": f"{group_id}_{participant_id}_{current_index}",
+                "id": f"{group_id}_{participant_id}_{int(time.time())}",
                 "author": author_name,
                 "user_id": participant_id,
                 "content": post_text,
