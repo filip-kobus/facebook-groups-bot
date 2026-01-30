@@ -107,6 +107,6 @@ class GroupProcessor:
             print(f"\n✅ All groups processed successfully")
 
         finally:
-            # Cleanup
-            await self.scraper.save_cookies()
-            await self.scraper.cleanup()
+            if self.scraper:
+                await self.scraper.context.storage_state(path="state.json")
+                await self.scraper.cleanup()

@@ -13,8 +13,6 @@ from config import HOURS_BACK, MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
 
 load_dotenv()
 
-COOKIES_FILE = "cookies.json"
-
 
 class FacebookScraper:
     """Handles Facebook authentication and post scraping with human-like behavior."""
@@ -183,38 +181,6 @@ class FacebookScraper:
         await self.page.get_by_role("button", name="Log In").click()
         await self.random_delay(3, 5)
     
-    @staticmethod
-    def is_authenticated() -> bool:
-        """Check if user is already authenticated via cookies."""
-        if not os.path.exists(COOKIES_FILE):
-            return False
-        
-        try:
-            with open(COOKIES_FILE, "r") as f:
-                context = json.load(f)
-            
-            cookies = context.get("cookies", [])
-            c_user = None
-            xs = None
-            
-            for cookie in cookies:
-                if cookie["name"] == "c_user":
-                    c_user = cookie
-                elif cookie["name"] == "xs":
-                    xs = cookie
-            
-            if not c_user or not xs:
-                return False
-            
-            current_time = time.time()
-            if c_user["expires"] < current_time or xs["expires"] < current_time:
-                return False
-            
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to validate authentication cookies: {e}")
-            return False
-    
     async def confirm_cookies(self):
         """Confirm cookies if popup appears."""
         try:
@@ -222,6 +188,10 @@ class FacebookScraper:
         except Exception as e:
             logger.debug(f"No cookie popup to confirm: {e}")
     
+    async def has_state(self) -> bool:
+        """Check if storage state file exists."""
+        return os.path.exists("state.json")
+
     async def close_notification_popup(self):
         """Close notification popup if it appears."""
         try:
@@ -249,13 +219,8 @@ class FacebookScraper:
                 '--disable-web-security',
                 '--disable-features=IsolateOrigins,site-per-process'
             ],
-            user_data_dir="./user_data"
         )
-        
-        self.context = self.browser.new_context()
-        await self.context.storage_state(path="state.json")
-        is_auth = self.is_authenticated()
-        
+
         context_options = {
             "viewport": {"width": viewport_width, "height": viewport_height},
             "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -263,13 +228,21 @@ class FacebookScraper:
             "timezone_id": "Europe/Warsaw",
             "permissions": ["geolocation"],
             "geolocation": {"latitude": 52.2297, "longitude": 21.0122},
+            "storage_state": "state.json",
         }
-        
-        if is_auth:
-            context_options["storage_state"] = COOKIES_FILE
+
+        # if not saved state, ask user to login and save state
+        if not await self.has_state():
+            context_options_no_storage = {k: v for k, v in context_options.items() if k != "storage_state"}
+            setup_context = await self.browser.new_context(**context_options_no_storage)
+            page = await setup_context.new_page()
+            await page.goto("https://www.facebook.com/login")
+            input("Skonfiguruj logowanie ręcznie, a następnie naciśnij Enter...")
+            await setup_context.storage_state(path="state.json")
+            await setup_context.close()
         
         self.context = await self.browser.new_context(**context_options)
-        
+
         await self.context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
@@ -281,14 +254,7 @@ class FacebookScraper:
         """)
         
         self.page = await self.context.new_page()
-        if not is_auth:
-            await self.login()
-            await self.confirm_cookies()
-            logger.info("Cookies saved after login")
         
-        await self.save_cookies()
-        input()
-        return self.playwright, self.browser, self.context, self.page
 
     async def get_message_box(self, user_id: str):
         """Open Facebook Messenger."""
@@ -521,11 +487,6 @@ class FacebookScraper:
             })
         
         return dane_z_postu
-    
-    async def save_cookies(self):
-        """Save authentication cookies."""
-        if self.context:
-            await self.context.storage_state(path=COOKIES_FILE)
     
     async def cleanup(self):
         """Cleanup browser resources."""

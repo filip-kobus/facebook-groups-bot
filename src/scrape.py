@@ -25,6 +25,7 @@ async def main():
         raise
     finally:
         if scraper:
+            await scraper.context.storage_state(path="state.json")
             await scraper.cleanup()
             logger.debug("Browser cleanup completed")
 
