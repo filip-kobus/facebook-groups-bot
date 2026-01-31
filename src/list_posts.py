@@ -5,14 +5,14 @@ from loguru import logger
 from database import SessionLocal, Post, Group, Lead
 
 
-async def list_posts():
+async def list_posts(file_path: str = "leads_report.txt"):
     try:
         async with SessionLocal() as db:
             now = datetime.datetime.utcnow()
             midnight_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
             midnight_yesterday = midnight_today - datetime.timedelta(days=1)
             # stmt = select(Post).where(Post.is_lead == True, Post.created_at >= midnight_yesterday)
-            stmt = select(Post).where(Post.is_lead == True)
+            stmt = select(Post).where(Post.is_lead == False)
             result = await db.execute(stmt)
             leads = result.scalars().all()
 
@@ -20,6 +20,7 @@ async def list_posts():
                 logger.info("No messages sent in the last 24 hours.")
                 return
 
+            contents = []
             logger.info(f"Messages sent in the last 24 hours ({len(leads)}):")
             for i, lead in enumerate(leads, 1):
                 print(f"\n--- Lead #{i} ---")
@@ -28,6 +29,14 @@ async def list_posts():
                 print(f"Post ID: {lead.post_id}")
                 print(f"Timestamp: {lead.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"Content: {lead.content}")
+                contents.append(lead.user_id)
+                contents.append(f'{lead.user_id}\n {lead.content}')
+                
+            with open(file_path, "w") as f:
+                f.write("\n".join(contents))
+
+            with open(file_path, "w") as f:
+                f.write("\n\n\nPOST_SEPARATOR\n\n\n".join(contents))
 
     except Exception as e:
         logger.exception(f"Fatal error in listing messages execution: {e}")
@@ -108,4 +117,4 @@ async def main():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(list_leads())
+    asyncio.run(list_posts())
