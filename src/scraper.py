@@ -9,7 +9,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 from loguru import logger
-from config import HOURS_BACK, MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
+from config import MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
 
 load_dotenv()
 
@@ -23,8 +23,6 @@ class FacebookScraper:
         """
         self.max_posts_to_scan = MAX_POSTS_TO_SCAN
         self.thinking_time_scale = max(0, min(10, THINKING_TIME_SCALE))
-        self.hours_back = HOURS_BACK
-        
         self.playwright = None
         self.browser = None
         self.context = None
@@ -110,18 +108,6 @@ class FacebookScraper:
         
         return None
     
-    def is_post_recent(self, post_date_str: str) -> bool:
-        """Check if post is within the specified hours_back range."""
-        if not post_date_str:
-            return True
-        
-        post_date = self.parse_facebook_date(post_date_str)
-        if not post_date:
-            return True
-        
-        cutoff_time = datetime.now() - timedelta(hours=self.hours_back)
-        return post_date >= cutoff_time
-
     async def random_delay(self, min_seconds: float = 1.5, max_seconds: float = 4.0):
         """Random delay between actions, scaled by thinking_time_scale."""       
         scaled_min = min_seconds * self.thinking_time_scale
@@ -336,8 +322,7 @@ class FacebookScraper:
         cutoff_time = datetime.now() - timedelta(hours=hours)
         return post_date < cutoff_time
 
-    async def scrape_posts(self, group_id: str) -> List[Dict]:
-        """Test scraping with dynamic list growth using while loop."""
+    async def scrape_posts(self, group_id: str, latest_post_date: Optional[datetime] = None) -> List[Dict]:
         await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
         await self.random_delay(1, 2)
         await self.close_notification_popup()
@@ -348,7 +333,7 @@ class FacebookScraper:
             logger.debug(f"Timeout waiting for posts to load: {e}")
         
         await self.human_like_scroll()
-        await self.random_delay(2, 3)
+        await self.random_delay(1, 2)
         posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
         number_of_posts = len(posts)
         logger.debug(f"Found {number_of_posts} total posts in DOM")
@@ -358,8 +343,7 @@ class FacebookScraper:
         dane_z_postu = []
         old_posts_streak = 0
 
-        is_recent = self.is_post_recent(data_postu)
-        while is_recent or old_posts_streak < 3:
+        while True:
             if current_index >= number_of_posts - 2:
                 await self.human_like_scroll()
                 await self.random_delay(1, 2)
@@ -367,7 +351,7 @@ class FacebookScraper:
                 number_of_posts = len(posts)
                 logger.debug(f"Found {number_of_posts} total posts in DOM")
 
-            await self.random_delay(2, 4)
+            await self.random_delay(1, 2)
             post = posts[current_index]
             
             try:
@@ -405,7 +389,7 @@ class FacebookScraper:
                         continue
                     
                     # await link.scroll_into_view_if_needed(timeout=1000)
-                    await self.random_delay(1.3, 1.7)
+                    await self.random_delay(0.1, 0.7)
                     await link.hover(timeout=1000)
                     
                     tooltip = self.page.locator('[role="tooltip"]')
@@ -425,10 +409,9 @@ class FacebookScraper:
                     continue
             
             if data_postu:
-                is_recent = self.is_post_recent(data_postu)
-                if not is_recent:
+                if latest_post_date and self.parse_facebook_date(data_postu) < latest_post_date:
                     old_posts_streak += 1
-                    logger.debug(f"Post date {data_postu} is older than {self.hours_back} hours, streak: {old_posts_streak}/3")
+                    logger.debug(f"Post date {data_postu} is older than latest in DB ({latest_post_date}), streak: {old_posts_streak}/3")
                     if old_posts_streak >= 3:
                         logger.debug(f"Found 3 old posts in a row, stopping")
                         break
@@ -436,7 +419,6 @@ class FacebookScraper:
                     continue
                 else:
                     old_posts_streak = 0
-                
             await post.scroll_into_view_if_needed(timeout=1000)
             await self.random_delay(0.2, 0.5)
             logger.debug(f"Processing initial post at index {current_index}")

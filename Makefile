@@ -2,6 +2,7 @@
 help:
 	@echo "Dostępne komendy:"
 	@echo "  make scrape        - Uruchamia proces scrapowania i zapisywania leadów do bazy danych."
+	@echo "  make sync-status   - Wyświetla czas od ostatniej synchronizacji dla każdej grupy."
 	@echo "  make send-messages - Wysyła wiadomości do leadów z ostatniego dnia."
 	@echo "  make list-messages - Wyświetla listę wiadomości wysłanych w ostatnim dniu."
 	@echo "  make setup         - Instaluje zależności projektu."
@@ -26,4 +27,14 @@ setup:
 	@echo "Instalowanie zależności..."
 	uv sync
 
-.PHONY: help scrape send-messages list-messages setup
+.PHONY: help scrape send-messages list-messages setup classify sync-status
+
+# Uruchamia skrypt do klasyfikacji postów
+classify:
+	@echo "Uruchamianie skryptu do klasyfikacji postów..."
+	uv run src/clasify_posts.py
+
+# Uruchamia skrypt do sprawdzania czasu od ostatniej synchronizacji
+sync-status:
+	@echo "Sprawdzanie czasu od ostatniej synchronizacji grup..."
+	uv run src/sync_time_checker.py

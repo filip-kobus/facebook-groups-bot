@@ -1,6 +1,5 @@
 
 
-HOURS_BACK = 24
 MAX_POSTS_TO_SCAN = 10000
 
 # Thinking time scale (0-10):
