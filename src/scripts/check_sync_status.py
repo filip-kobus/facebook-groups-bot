@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from sqlalchemy import select
 from loguru import logger
-from database import SessionLocal, Group
+from src.database import SessionLocal, Group
 
 
 async def get_last_sync_times():

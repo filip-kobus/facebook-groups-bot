@@ -1,8 +1,8 @@
 import asyncio
 from loguru import logger
 from sqlalchemy import select
-from analyzer import LeadAnalyzer
-from database import init_db, SessionLocal, Post, Lead, check_duplicate_lead
+from src.analyzer import LeadAnalyzer
+from src.database import init_db, SessionLocal, Post, Lead, check_duplicate_lead
 from dotenv import load_dotenv
 
 async def main():

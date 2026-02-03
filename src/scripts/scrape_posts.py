@@ -1,8 +1,8 @@
 import asyncio
 from loguru import logger
-from scraper import FacebookScraper
-from group_processor import GroupProcessor
-from database import init_db, SessionLocal, get_groups
+from src.scraper import FacebookScraper
+from src.group_processor import GroupProcessor
+from src.database import init_db, SessionLocal, get_groups
 
 async def main():
     """Main entry point for the Facebook groups lead scraper."""

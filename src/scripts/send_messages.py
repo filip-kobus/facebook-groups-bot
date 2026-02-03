@@ -2,9 +2,9 @@ import asyncio
 from httpx import post
 from sqlalchemy import select
 from loguru import logger
-from database import SessionLocal, Post, Lead
-from scraper import FacebookScraper
-from chatbot import Chatbot
+from src.database import SessionLocal, Post, Lead
+from src.scraper import FacebookScraper
+from src.chatbot import Chatbot
 
 async def main():
     """Main entry point for sending messages to leads from the last day."""

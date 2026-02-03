@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from sqlalchemy import select
 from loguru import logger
-from database import SessionLocal, Post, Group, Lead
+from src.database import SessionLocal, Post, Group, Lead
 
 
 async def list_posts(file_path: str = "leads_report.txt"):

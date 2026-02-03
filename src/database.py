@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, select, desc
-from groups import groups_ids
+from src.groups import groups_ids
 from typing import Optional
 from rapidfuzz import fuzz
 import datetime
