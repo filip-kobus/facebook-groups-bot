@@ -4,7 +4,7 @@ from typing import List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from scraper import FacebookScraper
-from database import Post, Group, get_last_scraping_date
+from database import Post, Group, get_last_scraping_date, check_duplicate_post
 from sqlalchemy.ext.asyncio import AsyncSession
 import datetime
 
@@ -44,7 +44,13 @@ class GroupProcessor:
                 user_id=post_data["user_id"],
                 group_id=group_id
             )
+
+            is_duplicate = await check_duplicate_post(self.db, post)
+            if is_duplicate:
+                print(f"Skipping duplicate post {post.post_id} from user {post.author}")
+                continue
             self.db.add(post)
+            
         result = await self.db.execute(
             select(Group).where(Group.group_id == group_id)
         )

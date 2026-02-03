@@ -84,18 +84,19 @@ async def get_not_classified_posts(db: AsyncSession):
     result = await db.execute(select(Post).where(Post.is_lead == None))
     return result.scalars().all()
 
+async def check_duplicate_post(db: AsyncSession, post: Post) -> bool:
+    """
+    Check if exact same post exists.
+    """
+    result = await db.execute(
+        select(Post).where(Post.content == post.content and Post.user_id == post.user_id)
+    )
+    existing_post = result.scalar_one_or_none()
+    return existing_post is not None
+
 async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str, similarity_threshold: float = 80.0) -> bool:
     """
     Check if the user already has a lead with similar content.
-    
-    Args:
-        db: Database session
-        user_id: The user ID to check
-        new_content: The new post content to compare
-        similarity_threshold: Minimum similarity score (0-100) to consider as duplicate. Default is 80.
-    
-    Returns:
-        True if a similar lead exists, False otherwise
     """
     # Get all posts from this user that are marked as leads
     result = await db.execute(
