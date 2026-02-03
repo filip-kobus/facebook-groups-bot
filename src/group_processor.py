@@ -34,7 +34,8 @@ class GroupProcessor:
         latest_post_date = await get_last_scraping_date(self.db, group_id)
        
         posts = await self.scraper.scrape_posts(group_id, latest_post_date)
-        print(f"\nScraped {len(posts)} new posts.")
+        number_of_new_posts = len(posts)
+        print(f"\nScraped {number_of_new_posts} new posts.")
         
         for post_data in posts:
             post = Post(
@@ -48,6 +49,7 @@ class GroupProcessor:
             is_duplicate = await check_duplicate_post(self.db, post)
             if is_duplicate:
                 print(f"Skipping duplicate post {post.post_id} from user {post.author}")
+                number_of_new_posts -= 1
                 continue
             self.db.add(post)
             
@@ -58,7 +60,7 @@ class GroupProcessor:
         group.last_scrape_date = start_time
         await self.db.commit()
         
-        print(f"\nGroup {group_id} complete: {len(posts)} new posts saved.")
+        print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
 
     async def process_all_groups(self, group_ids: List[str]):
         await self.scraper.init_browser()
