@@ -282,6 +282,7 @@ class FacebookScraper:
             else:
                 await message_box.type(char, delay=random.randint(50, 150))
 
+        input()
         await message_box.press("Enter")
         await self.random_delay(2, 3)
     

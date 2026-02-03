@@ -2,17 +2,13 @@ import asyncio
 import datetime
 from sqlalchemy import select
 from loguru import logger
-from src.database import SessionLocal, Post, Group, Lead
+from src.database import SessionLocal, Post, Group
 
 
-async def list_posts(file_path: str = "leads_report.txt"):
+async def list_leads():
     try:
         async with SessionLocal() as db:
-            now = datetime.datetime.now()
-            midnight_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            midnight_yesterday = midnight_today - datetime.timedelta(days=1)
-            # stmt = select(Post).where(Post.is_lead == True, Post.created_at >= midnight_yesterday)
-            stmt = select(Post).where(Post.is_lead == False)
+            stmt = select(Post).where(Post.is_lead == True, Post.is_contacted == False)
             result = await db.execute(stmt)
             leads = result.scalars().all()
 
@@ -20,50 +16,14 @@ async def list_posts(file_path: str = "leads_report.txt"):
                 logger.info("No messages sent in the last 24 hours.")
                 return
 
-            contents = []
             logger.info(f"Messages sent in the last 24 hours ({len(leads)}):")
             for i, lead in enumerate(leads, 1):
                 print(f"\n--- Lead #{i} ---")
                 print(f"Author: {lead.author} (ID: {lead.user_id})")
-                print(f"Group ID: {lead.group_id}")
-                print(f"Post ID: {lead.post_id}")
-                print(f"Timestamp: {lead.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
                 print(f"Content: {lead.content}")
-                contents.append(lead.user_id)
-                contents.append(f'{lead.user_id}\n {lead.content}')
-                
-            with open(file_path, "w") as f:
-                f.write("\n".join(contents))
-
-            with open(file_path, "w") as f:
-                f.write("\n\n\nPOST_SEPARATOR\n\n\n".join(contents))
 
     except Exception as e:
         logger.exception(f"Fatal error in listing messages execution: {e}")
-        raise
-
-async def list_leads():
-    try:
-        async with SessionLocal() as db:
-            stmt = select(Lead).where(Lead.is_contacted == False)
-            result = await db.execute(stmt)
-            leads = result.scalars().all()
-
-            if not leads:
-                logger.info("No leads found in the database.")
-                return
-
-            logger.info(f"Listing all leads ({len(leads)}):")
-            for i, lead in enumerate(leads, 1):
-                post = await db.execute(select(Post).where(Post.post_id == lead.post_id))
-                post = post.scalar_one_or_none()
-                print(f"\n--- Lead #{i} ---")
-                print(f"Post ID: {lead.post_id}")
-                print(f"Is Contacted: {lead.is_contacted}")
-                print(f"Content: {post.content}")
-
-    except Exception as e:
-        logger.exception(f"Fatal error in listing leads execution: {e}")
         raise
 
 async def list_groups():

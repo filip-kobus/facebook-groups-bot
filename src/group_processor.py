@@ -1,17 +1,16 @@
 import asyncio
 import random
+import datetime
+import os
 from typing import List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from src.scraper import FacebookScraper
 from src.database import Post, Group, get_last_scraping_date, check_duplicate_post
 from sqlalchemy.ext.asyncio import AsyncSession
-import datetime
-
+from loguru import logger
 
 class GroupProcessor:
-    """Orchestrates the processing of Facebook groups - scraping, analyzing, and exporting."""
-    
     def __init__(
         self,
         scraper: FacebookScraper,
@@ -67,6 +66,14 @@ class GroupProcessor:
             print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
             
         except Exception as e:
+            os.makedirs("logs/screenshots", exist_ok=True)
+            screenshot_path = f"logs/screenshots/error_{group_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            try:
+                await self.scraper.page.screenshot(path=screenshot_path)
+                logger.error(f"Error screenshot saved to {screenshot_path}")
+            except Exception as screenshot_error:
+                logger.error(f"Failed to capture screenshot: {screenshot_error}")
+            
             group.last_scrape_date = start_time
             group.last_run_error = True
             group.last_error_message = str(e)
