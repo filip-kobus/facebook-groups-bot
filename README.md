@@ -1,4 +1,6 @@
 uv run playwright install --with-deps chromium
 
-[role="feed"] [aria-posinset]
-[data-ad-rendering-role="story_message"]
+# Wymagania - przy pierwszy runie z logowaniem należy:
+- ustawić język na angielski
+- wejść we wiadomości i wpisać swój pin
+- wejść na dowolną grupę i wyłączyć tłumaczenie postów na angielski
