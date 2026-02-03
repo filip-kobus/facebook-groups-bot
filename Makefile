@@ -10,17 +10,17 @@ help:
 # Uruchamia skrypt do scrapowania
 scrape:
 	@echo "Uruchamianie skryptu scrapującego..."
-	uv run src/scrape.py
+	uv run src/scripts/scrape_posts.py
 
 # Uruchamia skrypt do wysyłania wiadomości
 send-messages:
 	@echo "Uruchamianie skryptu do wysyłania wiadomości..."
-	uv run src/send_messages.py
+	uv run src/scripts/send_messages.py
 
 # Uruchamia skrypt do listowania wiadomości
 list:
 	@echo "Uruchamianie skryptu do listowania wiadomości..."
-	uv run src/list_posts.py
+	uv run src/scripts/list_posts.py
 
 # Instaluje zależności
 setup:
@@ -32,9 +32,9 @@ setup:
 # Uruchamia skrypt do klasyfikacji postów
 classify:
 	@echo "Uruchamianie skryptu do klasyfikacji postów..."
-	uv run src/clasify_posts.py
+	uv run src/scripts/classify_posts.py
 
 # Uruchamia skrypt do sprawdzania czasu od ostatniej synchronizacji
 sync-status:
 	@echo "Sprawdzanie czasu od ostatniej synchronizacji grup..."
-	uv run src/sync_time_checker.py
+	uv run src/scripts/sync_time_checker.py
