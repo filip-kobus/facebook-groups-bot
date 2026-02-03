@@ -20,6 +20,13 @@ async def index(request: Request):
         )
         leads = leads_result.scalars().all()
         
+        contacted_result = await session.execute(
+            select(Post)
+            .where(Post.is_lead == True, Post.is_contacted == True)
+            .order_by(Post.created_at.desc())
+        )
+        contacted = contacted_result.scalars().all()
+        
         groups_result = await session.execute(
             select(Group).order_by(Group.group_id)
         )
@@ -27,7 +34,7 @@ async def index(request: Request):
     
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "leads": leads, "groups": groups}
+        {"request": request, "leads": leads, "contacted": contacted, "groups": groups}
     )
 
 
@@ -94,3 +101,40 @@ async def get_groups():
         }
         for group in groups
     ]
+
+
+@app.get("/api/contacted")
+async def get_contacted():
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Post)
+            .where(Post.is_lead == True, Post.is_contacted == True)
+            .order_by(Post.created_at.desc())
+        )
+        contacted = result.scalars().all()
+    
+    return [
+        {
+            "post_id": lead.post_id,
+            "author": lead.author,
+            "content": lead.content[:200] + "..." if len(lead.content) > 200 else lead.content,
+            "created_at": lead.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "group_id": lead.group_id,
+        }
+        for lead in contacted
+    ]
+
+
+@app.post("/api/contacted/{post_id}/reset")
+async def reset_contact(post_id: str):
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Post).where(Post.post_id == post_id)
+        )
+        post = result.scalar_one_or_none()
+        
+        if post:
+            post.is_contacted = False
+            await session.commit()
+    
+    return {"success": True}
