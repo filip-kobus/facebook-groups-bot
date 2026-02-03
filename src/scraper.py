@@ -386,7 +386,8 @@ class FacebookScraper:
                     continue
             
             if data_postu:
-                if latest_post_date and self.parse_facebook_date(data_postu) < latest_post_date:
+                parsed_date = self.parse_facebook_date(data_postu)
+                if latest_post_date and parsed_date and parsed_date < latest_post_date:
                     old_posts_streak += 1
                     logger.debug(f"Post date {data_postu} is older than latest in DB ({latest_post_date}), streak: {old_posts_streak}/3")
                     if old_posts_streak >= 3:
