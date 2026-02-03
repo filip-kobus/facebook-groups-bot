@@ -224,7 +224,6 @@ class FacebookScraper:
         await self.page.goto(f"https://www.facebook.com//{user_id}")
         await self.random_delay(2, 4)
 
-        input()
         try:
             close_buttons = self.page.locator('[aria-label*="Close" i]')
             count = await close_buttons.count()
@@ -282,7 +281,6 @@ class FacebookScraper:
             else:
                 await message_box.type(char, delay=random.randint(50, 150))
 
-        input()
         await message_box.press("Enter")
         await self.random_delay(2, 3)
     

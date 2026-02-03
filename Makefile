@@ -32,3 +32,7 @@ classify:
 sync-status:
 	@echo "Sprawdzanie czasu od ostatniej synchronizacji grup..."
 	uv run python -m src.scripts.check_sync_status
+
+admin:
+	@echo "Uruchamianie panelu admina..."
+	uv run uvicorn src.admin_panel.app:app --reload

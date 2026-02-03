@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Groups Bot - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body { background-color: #f8f9fa; }
+        .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .post-content { 
+            max-height: 150px; 
+            overflow-y: auto; 
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+        .error-badge { background-color: #dc3545; }
+        .success-badge { background-color: #28a745; }
+        .btn-sm { font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">📊 Facebook Groups Bot - Admin Panel</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">🎯 Pending Leads</h5>
+                        <button class="btn btn-sm btn-outline-primary" 
+                                hx-get="/api/leads" 
+                                hx-target="#leads-tbody"
+                                hx-swap="innerHTML">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Author</th>
+                                        <th>Content</th>
+                                        <th>Date</th>
+                                        <th>Group</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leads-tbody">
+                                    {% for lead in leads %}
+                                    <tr id="lead-{{ lead.post_id }}">
+                                        <td>{{ lead.author }}</td>
+                                        <td>
+                                            <div class="post-content">{{ lead.content }}</div>
+                                        </td>
+                                        <td class="text-nowrap">{{ lead.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ lead.group_id }}</td>
+                                        <td class="text-nowrap">
+                                            <button class="btn btn-sm btn-warning"
+                                                    hx-post="/api/leads/{{ lead.post_id }}/unmark"
+                                                    hx-target="#lead-{{ lead.post_id }}"
+                                                    hx-swap="outerHTML"
+                                                    hx-confirm="Unmark this lead?">
+                                                ✖️ Unmark
+                                            </button>
+                                            <button class="btn btn-sm btn-danger"
+                                                    hx-delete="/api/leads/{{ lead.post_id }}"
+                                                    hx-target="#lead-{{ lead.post_id }}"
+                                                    hx-swap="outerHTML"
+                                                    hx-confirm="Delete this lead?">
+                                                🗑️ Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if not leads %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            No pending leads found
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">🔄 Group Sync Status</h5>
+                        <button class="btn btn-sm btn-outline-primary" 
+                                hx-get="/api/groups" 
+                                hx-target="#groups-tbody"
+                                hx-swap="innerHTML">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Group ID</th>
+                                        <th>Last Scrape</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="groups-tbody">
+                                    {% for group in groups %}
+                                    <tr>
+                                        <td class="text-break small">{{ group.group_id }}</td>
+                                        <td class="text-nowrap small">
+                                            {% if group.last_scrape_date %}
+                                                {{ group.last_scrape_date.strftime('%Y-%m-%d %H:%M') }}
+                                            {% else %}
+                                                Never
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if group.last_run_error %}
+                                                <span class="badge error-badge" 
+                                                      title="{{ group.last_error_message }}">
+                                                    ❌ Error
+                                                </span>
+                                            {% else %}
+                                                <span class="badge success-badge">✅ OK</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">ℹ️ Quick Stats</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Pending Leads:</span>
+                            <strong>{{ leads|length }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Total Groups:</span>
+                            <strong>{{ groups|length }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Groups with Errors:</span>
+                            <strong class="text-danger">
+                                {{ groups|selectattr('last_run_error')|list|length }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id === 'leads-tbody') {
+                const data = JSON.parse(event.detail.xhr.response);
+                if (data.length === 0) {
+                    event.detail.target.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                No pending leads found
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    event.detail.target.innerHTML = data.map(lead => `
+                        <tr id="lead-${lead.post_id}">
+                            <td>${lead.author}</td>
+                            <td>
+                                <div class="post-content">${lead.content}</div>
+                            </td>
+                            <td class="text-nowrap">${lead.created_at}</td>
+                            <td>${lead.group_id}</td>
+                            <td class="text-nowrap">
+                                <button class="btn btn-sm btn-warning"
+                                        hx-post="/api/leads/${lead.post_id}/unmark"
+                                        hx-target="#lead-${lead.post_id}"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Unmark this lead?">
+                                    ✖️ Unmark
+                                </button>
+                                <button class="btn btn-sm btn-danger"
+                                        hx-delete="/api/leads/${lead.post_id}"
+                                        hx-target="#lead-${lead.post_id}"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Delete this lead?">
+                                    🗑️ Delete
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    htmx.process(event.detail.target);
+                }
+            }
+            
+            if (event.detail.target.id === 'groups-tbody') {
+                const data = JSON.parse(event.detail.xhr.response);
+                event.detail.target.innerHTML = data.map(group => `
+                    <tr>
+                        <td class="text-break small">${group.group_id}</td>
+                        <td class="text-nowrap small">${group.last_scrape_date}</td>
+                        <td>
+                            ${group.last_run_error ? 
+                                `<span class="badge error-badge" title="${group.last_error_message}">❌ Error</span>` :
+                                `<span class="badge success-badge">✅ OK</span>`
+                            }
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        });
+    </script>
+</body>
+</html>
