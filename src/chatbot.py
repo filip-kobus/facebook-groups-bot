@@ -44,7 +44,7 @@ Pozdrawiam :)"
 ### WAŻNE!!!
 
 - Jeśli w treści posta nie ma podanych informacji to nie piszesz co wiesz z ogłoszenia.
-- Autor nie kontaktował się wcześniej - nie nawiązujesz do wcześniejszej rozmowy.
+- Autor nie kontaktował się wcześniej - nie nawiązujesz do wcześniejszej rozmowy. Nie dziękujesz za kontakt lub przesłane informacje.
 - Trzymaj się powyższego przykładu, nie dodawaj nic więcej ani nic mniej jeśli nie ma takiej potrzeby.
 - Nie powtarzaj informacji z posta jeśli nie są potrzebne do wiadomości. Tylko rzeczy niezbędne do przygotowania oferty.
 """
