@@ -22,8 +22,10 @@ class Post(Base):
     user_id = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.now)
     is_lead = Column(Boolean, default=None, nullable=True)
+    is_contacted = Column(Boolean, default=False)
     group_id = Column(String, ForeignKey("group.group_id"))
     group = relationship("Group", back_populates="posts")
+    messages = relationship("Message", back_populates="post")
 
 class Group(Base):
     __tablename__ = "group"
@@ -35,22 +37,14 @@ class Group(Base):
     last_error_message = Column(String, nullable=True)
     posts = relationship("Post", back_populates="group")
 
-class Lead(Base):
-    __tablename__ = "lead"
-
-    id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(String, unique=True, index=True)
-    is_contacted = Column(Boolean, default=False)
-    messages = relationship("Message", back_populates="lead")
-
 class Message(Base):
-    __tablename__ = "message"
+    __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(String)
     sent_at = Column(DateTime, default=datetime.datetime.now)
-    lead_id = Column(Integer, ForeignKey("lead.id"))
-    lead = relationship("Lead", back_populates="messages")
+    post_id = Column(String, ForeignKey("posts.post_id"))
+    post = relationship("Post", back_populates="messages")
 
 async def init_db():
     async with engine.begin() as conn:
@@ -70,7 +64,6 @@ async def get_db():
         yield session
 
 async def get_last_scraping_date(db: AsyncSession, group_id: str) -> Optional[datetime.datetime]:
-    """Retrieve the latest post date for a given group from the database."""
     result = await db.execute(
         select(Group.last_scrape_date)
         .where(Group.group_id == group_id)
@@ -87,9 +80,6 @@ async def get_not_classified_posts(db: AsyncSession):
     return result.scalars().all()
 
 async def check_duplicate_post(db: AsyncSession, post: Post) -> bool:
-    """
-    Check if exact same post exists.
-    """
     result = await db.execute(
         select(Post).where(Post.content == post.content and Post.user_id == post.user_id)
     )
@@ -97,26 +87,19 @@ async def check_duplicate_post(db: AsyncSession, post: Post) -> bool:
     return existing_post is not None
 
 async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str, similarity_threshold: float = 80.0) -> bool:
-    """
-    Check if the user already has a lead with similar content.
-    """
-    # Get all posts from this user that are marked as leads
     result = await db.execute(
         select(Post)
-        .join(Lead, Post.post_id == Lead.post_id)
-        .where(Post.user_id == user_id)
+        .where(Post.user_id == user_id, Post.is_lead == True)
     )
     existing_lead_posts = result.scalars().all()
     
     if not existing_lead_posts:
         return False
     
-    # Check similarity with each existing lead post
     for existing_post in existing_lead_posts:
         if not existing_post.content or not new_content:
             continue
             
-        # Use partial ratio for better matching of similar text
         similarity_score = fuzz.partial_ratio(existing_post.content.lower(), new_content.lower())
         
         if similarity_score >= similarity_threshold:
