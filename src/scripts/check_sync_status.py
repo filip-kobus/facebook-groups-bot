@@ -11,7 +11,10 @@ async def get_last_sync_times():
             result = await db.execute(select(Group))
             groups = result.scalars().all()
             for group in groups:
-                print(f"Group ID: {group.group_id} | Last Sync Time: {group.last_scrape_date}")
+                status = "❌ ERROR" if group.last_run_error else "✅ OK"
+                print(f"Group ID: {group.group_id} | Last Sync: {group.last_scrape_date} | Status: {status}")
+                if group.last_run_error and group.last_error_message:
+                    print(f"  Error: {group.last_error_message}")
 
     except Exception as e:
         logger.exception(f"Fatal error in listing messages execution: {e}")

@@ -31,6 +31,8 @@ class Group(Base):
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(String, unique=True, index=True)
     last_scrape_date = Column(DateTime, default=datetime.datetime.now)
+    last_run_error = Column(Boolean, default=False)
+    last_error_message = Column(String, nullable=True)
     posts = relationship("Post", back_populates="group")
 
 class Lead(Base):

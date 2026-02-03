@@ -32,35 +32,47 @@ class GroupProcessor:
         
         start_time = datetime.datetime.now()
         latest_post_date = await get_last_scraping_date(self.db, group_id)
-       
-        posts = await self.scraper.scrape_posts(group_id, latest_post_date)
-        number_of_new_posts = len(posts)
-        print(f"\nScraped {number_of_new_posts} new posts.")
         
-        for post_data in posts:
-            post = Post(
-                post_id=post_data["id"],
-                content=post_data["content"],
-                author=post_data["author"],
-                user_id=post_data["user_id"],
-                group_id=group_id
-            )
-
-            is_duplicate = await check_duplicate_post(self.db, post)
-            if is_duplicate:
-                print(f"Skipping duplicate post {post.post_id} from user {post.author}")
-                number_of_new_posts -= 1
-                continue
-            self.db.add(post)
-            
         result = await self.db.execute(
             select(Group).where(Group.group_id == group_id)
         )
-        group = result.scalar_one_or_none()
-        group.last_scrape_date = start_time
-        await self.db.commit()
+        group = result.scalars().first()
         
-        print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
+        try:
+            posts = await self.scraper.scrape_posts(group_id, latest_post_date)
+            number_of_new_posts = len(posts)
+            print(f"\nScraped {number_of_new_posts} new posts.")
+            
+            for post_data in posts:
+                post = Post(
+                    post_id=post_data["id"],
+                    content=post_data["content"],
+                    author=post_data["author"],
+                    user_id=post_data["user_id"],
+                    group_id=group_id
+                )
+
+                is_duplicate = await check_duplicate_post(self.db, post)
+                if is_duplicate:
+                    print(f"Skipping duplicate post {post.post_id} from user {post.author}")
+                    number_of_new_posts -= 1
+                    continue
+                self.db.add(post)
+            
+            group.last_scrape_date = start_time
+            group.last_run_error = False
+            group.last_error_message = None
+            await self.db.commit()
+            
+            print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
+            
+        except Exception as e:
+            group.last_scrape_date = start_time
+            group.last_run_error = True
+            group.last_error_message = str(e)
+            await self.db.commit()
+            print(f"\nError in group {group_id}: {e}")
+            raise
 
     async def process_all_groups(self, group_ids: List[str]):
         await self.scraper.init_browser()
