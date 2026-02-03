@@ -224,12 +224,14 @@ class FacebookScraper:
         await self.page.goto(f"https://www.facebook.com//{user_id}")
         await self.random_delay(2, 4)
 
-        # Delikatny scroll i ruch myszką do przycisku "Message"
+        input()
         try:
             close_buttons = self.page.locator('[aria-label*="Close" i]')
-            if await close_buttons.count() > 0:
-                await close_buttons.first.click()
-                await self.random_delay(1, 2)
+            count = await close_buttons.count()
+            if count > 0:
+                for i in range(count):
+                    await close_buttons.nth(i).click()
+                    await self.random_delay(1, 2)
         except Exception as e:
             pass
         await self.page.mouse.move(200, 300)
