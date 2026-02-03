@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from sqlalchemy import select, delete
 
-from src.database import SessionLocal, Post, Group
+from src.database import SessionLocal, Post, Group, Message
 
 app = FastAPI()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -138,3 +138,28 @@ async def reset_contact(post_id: str):
             await session.commit()
     
     return {"success": True}
+
+
+@app.get("/api/messages")
+async def get_messages():
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Message)
+            .join(Post)
+            .order_by(Message.sent_at.desc())
+        )
+        messages = result.scalars().all()
+    
+    return [
+        {
+            "id": message.id,
+            "content": message.content,
+            "sent_at": message.sent_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "post_id": message.post_id,
+            "post_author": message.post.author if message.post else "Unknown",
+            "post_content": (message.post.content[:100] + "...") if message.post and len(message.post.content) > 100 else (message.post.content if message.post else ""),
+            "group_id": message.post.group_id if message.post else "Unknown"
+        }
+        for message in messages
+    ]
+
