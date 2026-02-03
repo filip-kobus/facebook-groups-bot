@@ -8,7 +8,7 @@ from src.database import SessionLocal, Post, Group, Lead
 async def list_posts(file_path: str = "leads_report.txt"):
     try:
         async with SessionLocal() as db:
-            now = datetime.datetime.utcnow()
+            now = datetime.datetime.now()
             midnight_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
             midnight_yesterday = midnight_today - datetime.timedelta(days=1)
             # stmt = select(Post).where(Post.is_lead == True, Post.created_at >= midnight_yesterday)
@@ -91,7 +91,7 @@ async def main():
     """Main entry point for listing messages sent to leads from the last day."""
     try:
         async with SessionLocal() as db:
-            now = datetime.datetime.utcnow()
+            now = datetime.datetime.now()
             midnight_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
             midnight_yesterday = midnight_today - datetime.timedelta(days=1)
             # stmt = select(Post).where(Post.is_lead == True, Post.created_at >= midnight_yesterday)

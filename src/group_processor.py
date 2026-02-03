@@ -3,8 +3,8 @@ import random
 from typing import List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from scraper import FacebookScraper
-from database import Post, Group, get_last_scraping_date, check_duplicate_post
+from src.scraper import FacebookScraper
+from src.database import Post, Group, get_last_scraping_date, check_duplicate_post
 from sqlalchemy.ext.asyncio import AsyncSession
 import datetime
 
@@ -30,7 +30,7 @@ class GroupProcessor:
         print(f"Processing group: {group_id}")
         print(f"{'='*80}\n")
         
-        start_time = datetime.datetime.utcnow()
+        start_time = datetime.datetime.now()
         latest_post_date = await get_last_scraping_date(self.db, group_id)
        
         posts = await self.scraper.scrape_posts(group_id, latest_post_date)

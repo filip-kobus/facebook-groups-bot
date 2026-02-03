@@ -20,7 +20,7 @@ class Post(Base):
     content = Column(String)
     author = Column(String)
     user_id = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
     is_lead = Column(Boolean, default=None, nullable=True)
     group_id = Column(String, ForeignKey("group.group_id"))
     group = relationship("Group", back_populates="posts")
@@ -30,7 +30,7 @@ class Group(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(String, unique=True, index=True)
-    last_scrape_date = Column(DateTime, default=datetime.datetime.utcnow)
+    last_scrape_date = Column(DateTime, default=datetime.datetime.now)
     posts = relationship("Post", back_populates="group")
 
 class Lead(Base):
@@ -46,7 +46,7 @@ class Message(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(String)
-    sent_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sent_at = Column(DateTime, default=datetime.datetime.now)
     lead_id = Column(Integer, ForeignKey("lead.id"))
     lead = relationship("Lead", back_populates="messages")
 
@@ -54,7 +54,7 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with SessionLocal() as session:
-        one_day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        one_day_ago = datetime.datetime.now() - datetime.timedelta(days=1)
         for group_id in groups_ids:
             exists = await session.execute(
                 select(Group).where(Group.group_id == group_id)

@@ -9,7 +9,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 from loguru import logger
-from config import MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
+from src.config import MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
 
 load_dotenv()
 
