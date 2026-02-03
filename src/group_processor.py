@@ -72,5 +72,4 @@ class GroupProcessor:
 
         finally:
             if self.scraper:
-                await self.scraper.context.storage_state(path="state.json")
                 await self.scraper.cleanup()

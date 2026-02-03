@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, select, desc
 from groups import groups_ids
 from typing import Optional
+from rapidfuzz import fuzz
 import datetime
 
 DATABASE_URL = "sqlite+aiosqlite:///leads.db"
@@ -82,3 +83,40 @@ async def get_groups(db: AsyncSession):
 async def get_not_classified_posts(db: AsyncSession):
     result = await db.execute(select(Post).where(Post.is_lead == None))
     return result.scalars().all()
+
+async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str, similarity_threshold: float = 80.0) -> bool:
+    """
+    Check if the user already has a lead with similar content.
+    
+    Args:
+        db: Database session
+        user_id: The user ID to check
+        new_content: The new post content to compare
+        similarity_threshold: Minimum similarity score (0-100) to consider as duplicate. Default is 80.
+    
+    Returns:
+        True if a similar lead exists, False otherwise
+    """
+    # Get all posts from this user that are marked as leads
+    result = await db.execute(
+        select(Post)
+        .join(Lead, Post.post_id == Lead.post_id)
+        .where(Post.user_id == user_id)
+    )
+    existing_lead_posts = result.scalars().all()
+    
+    if not existing_lead_posts:
+        return False
+    
+    # Check similarity with each existing lead post
+    for existing_post in existing_lead_posts:
+        if not existing_post.content or not new_content:
+            continue
+            
+        # Use partial ratio for better matching of similar text
+        similarity_score = fuzz.partial_ratio(existing_post.content.lower(), new_content.lower())
+        
+        if similarity_score >= similarity_threshold:
+            return True
+    
+    return False

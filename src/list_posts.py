@@ -45,7 +45,7 @@ async def list_posts(file_path: str = "leads_report.txt"):
 async def list_leads():
     try:
         async with SessionLocal() as db:
-            stmt = select(Lead)
+            stmt = select(Lead).where(Lead.is_contacted == False)
             result = await db.execute(stmt)
             leads = result.scalars().all()
 
@@ -117,4 +117,4 @@ async def main():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(list_posts())
+    asyncio.run(list_leads())

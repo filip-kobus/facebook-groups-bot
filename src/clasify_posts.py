@@ -2,7 +2,7 @@ import asyncio
 from loguru import logger
 from sqlalchemy import select
 from analyzer import LeadAnalyzer
-from database import init_db, SessionLocal, Post, Lead
+from database import init_db, SessionLocal, Post, Lead, check_duplicate_lead
 from dotenv import load_dotenv
 
 async def main():
@@ -41,8 +41,27 @@ async def main():
                 is_lead = analyzed_post_data["is_lead"]
                 
                 if is_lead:
-                    new_lead = Lead(post_id=post_id, is_contacted=False)
-                    db.add(new_lead)
+                    # Get the post to check for duplicates
+                    post_query = select(Post).filter(Post.post_id == post_id)
+                    post_result = await db.execute(post_query)
+                    current_post = post_result.scalar_one_or_none()
+                    
+                    if current_post:
+                        # Check if this author already has a similar lead
+                        is_duplicate = await check_duplicate_lead(
+                            db, 
+                            current_post.user_id, 
+                            current_post.content,
+                            similarity_threshold=80.0  # Adjust threshold as needed (0-100)
+                        )
+                        
+                        if is_duplicate:
+                            logger.info(f"Skipping duplicate lead for post {post_id} from user {current_post.author}")
+                            is_lead = False  # Don't save as lead, but mark as classified
+                        else:
+                            new_lead = Lead(post_id=post_id, is_contacted=False)
+                            db.add(new_lead)
+                            logger.info(f"Added new lead for post {post_id} from user {current_post.author}")
 
                 post_to_update_query = select(Post).filter(Post.post_id == post_id)
                 post_to_update_result = await db.execute(post_to_update_query)

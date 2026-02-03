@@ -173,10 +173,6 @@ class FacebookScraper:
             await self.page.get_by_role("button", name="Allow all cookies").click(timeout=5000)
         except Exception as e:
             logger.debug(f"No cookie popup to confirm: {e}")
-    
-    async def has_state(self) -> bool:
-        """Check if storage state file exists."""
-        return os.path.exists("state.json")
 
     async def close_notification_popup(self):
         """Close notification popup if it appears."""
@@ -189,14 +185,25 @@ class FacebookScraper:
         except Exception as e:
             logger.debug(f"No notification popup to close: {e}")
 
+    async def is_logged_in(self) -> bool:
+        """Check if user is logged in by looking for profile icon."""
+        cookies = await self.browser.cookies("https://www.facebook.com")
+    
+        for cookie in cookies:
+            if cookie['name'] == 'c_user':
+                print(f"Znaleziono sesję dla użytkownika ID: {cookie['value']}")
+                return True
+        return False
+
     async def init_browser(self) -> Tuple:
         """Initialize browser and authenticate."""
         self.playwright = await async_playwright().start()
-        viewport_width = random.randint(1366, 1920)
-        viewport_height = random.randint(768, 1080)
-        
-        self.browser = await self.playwright.chromium.launch(
+        user_data_dir = "fb_user_data"
+
+        self.browser = await self.playwright.chromium.launch_persistent_context(
             headless=False,
+            channel="chrome",
+            user_data_dir=user_data_dir,
             args=[
                 '--disable-blink-features=AutomationControlled',
                 '--disable-dev-shm-usage',
@@ -207,40 +214,10 @@ class FacebookScraper:
             ],
         )
 
-        context_options = {
-            "viewport": {"width": viewport_width, "height": viewport_height},
-            "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "locale": "en-US",
-            "timezone_id": "Europe/Warsaw",
-            "permissions": ["geolocation"],
-            "geolocation": {"latitude": 52.2297, "longitude": 21.0122},
-            "storage_state": "state.json",
-        }
+        self.page = await self.browser.new_page()
 
-        # if not saved state, ask user to login and save state
-        if not await self.has_state():
-            context_options_no_storage = {k: v for k, v in context_options.items() if k != "storage_state"}
-            setup_context = await self.browser.new_context(**context_options_no_storage)
-            page = await setup_context.new_page()
-            await page.goto("https://www.facebook.com/login")
-            input("Skonfiguruj logowanie ręcznie, a następnie naciśnij Enter...")
-            await setup_context.storage_state(path="state.json")
-            await setup_context.close()
-        
-        self.context = await self.browser.new_context(**context_options)
-
-        await self.context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            
-            window.chrome = {
-                runtime: {}
-            };
-        """)
-        
-        self.page = await self.context.new_page()
-        
+        if not await self.is_logged_in():
+            input("Nie znaleziono aktywnej sesji. Zaloguj się ręcznie i naciśnij Enter...")
 
     async def get_message_box(self, user_id: str):
         """Open Facebook Messenger."""
@@ -303,11 +280,9 @@ class FacebookScraper:
             else:
                 await message_box.type(char, delay=random.randint(50, 150))
 
-        
-        await self.random_delay(1, 2)
         await message_box.press("Enter")
         await self.random_delay(2, 3)
-        
+    
         return True
 
     async def is_x_hours_older(self, post_date_str: str, hours: int) -> bool:
@@ -360,7 +335,7 @@ class FacebookScraper:
             except:
                 logger.debug("Failed to scroll to post, skipping")
                 current_index += 1
-                continue              
+                continue
             author_locator = post.locator('b').first
             try:
                 await author_locator.scroll_into_view_if_needed(timeout=1000)
@@ -397,12 +372,12 @@ class FacebookScraper:
                     await self.random_delay(0.5, 1.0)
                     
                     has_time = re.search(r'\d{1,2}:\d{2}', tooltip_text)
-                    has_day = re.search(r'\b\d{1,2}\b', tooltip_text) 
+                    has_day = re.search(r'\b\d{1,2}\b', tooltip_text)
                     if has_time or has_day:
                         data_postu = tooltip_text
                         logger.debug(f"Found tooltip with date/time: {tooltip_text}")
                         break
-                    else:                    
+                    else:
                         logger.debug(f"Tooltip does not contain date/time: {tooltip_text}")
                 except Exception as e:
                     logger.debug(f"Failed to hover or get tooltip: {str(e)}")

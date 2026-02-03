@@ -32,7 +32,7 @@ class Chatbot:
 
 ### Przykładowa wiadomość:
 
-"Witam Panie/Pani --imie--,
+"Witam,
 
 Jestem doradcą ds. finansowania w Alior Leasing.
 Kontaktuję się w celu zaproponowania oferty na finansowanie pojazdu.
