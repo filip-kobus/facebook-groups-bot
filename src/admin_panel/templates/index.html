@@ -30,6 +30,17 @@
         .nav-tabs .nav-link.active {
             font-weight: bold;
         }
+        .pagination {
+            margin-top: 1rem;
+        }
+        .pagination-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
     </style>
 </head>
 <body>
@@ -74,14 +85,8 @@
             <!-- LEADS TAB -->
             <div class="tab-pane fade show active" id="leads-pane" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h5 class="mb-0">🎯 Leady czekające na kontakt</h5>
-                        <button class="btn btn-sm btn-outline-primary" 
-                                hx-get="/api/leads" 
-                                hx-target="#leads-tbody"
-                                hx-swap="innerHTML">
-                            🔄 Odśwież
-                        </button>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -107,15 +112,13 @@
                                         <td class="text-nowrap">
                                             <button class="btn btn-sm btn-warning"
                                                     hx-post="/api/leads/{{ lead.post_id }}/unmark"
-                                                    hx-target="#lead-{{ lead.post_id }}"
-                                                    hx-swap="outerHTML"
+                                                    hx-target="closest tr"
                                                     hx-confirm="Odznaczyć ten lead?">
                                                 ✖️ Odznacz
                                             </button>
                                             <button class="btn btn-sm btn-danger"
                                                     hx-delete="/api/leads/{{ lead.post_id }}"
-                                                    hx-target="#lead-{{ lead.post_id }}"
-                                                    hx-swap="outerHTML"
+                                                    hx-target="closest tr"
                                                     hx-confirm="Usunąć ten lead?">
                                                 🗑️ Usuń
                                             </button>
@@ -132,6 +135,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="pagination-info">
+                            <div id="leads-info" class="text-muted"></div>
+                            <nav id="leads-pagination"></nav>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -139,14 +146,8 @@
             <!-- CONTACTED TAB -->
             <div class="tab-pane fade" id="contacted-pane" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h5 class="mb-0">✅ Leady skontaktowane</h5>
-                        <button class="btn btn-sm btn-outline-primary" 
-                                hx-get="/api/contacted" 
-                                hx-target="#contacted-tbody"
-                                hx-swap="innerHTML">
-                            🔄 Odśwież
-                        </button>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -172,8 +173,7 @@
                                         <td class="text-nowrap">
                                             <button class="btn btn-sm btn-success"
                                                     hx-post="/api/contacted/{{ lead.post_id }}/reset"
-                                                    hx-target="#contacted-{{ lead.post_id }}"
-                                                    hx-swap="outerHTML"
+                                                    hx-target="closest tr"
                                                     hx-confirm="Zresetować status kontaktu? Bot skontaktuje się ponownie.">
                                                 🔄 Resetuj
                                             </button>
@@ -190,6 +190,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="pagination-info">
+                            <div id="contacted-info" class="text-muted"></div>
+                            <nav id="contacted-pagination"></nav>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -197,14 +201,8 @@
             <!-- MESSAGES TAB -->
             <div class="tab-pane fade" id="messages-pane" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h5 class="mb-0">💬 Historia wysłanych wiadomości</h5>
-                        <button class="btn btn-sm btn-outline-primary" 
-                                hx-get="/api/messages" 
-                                hx-target="#messages-tbody"
-                                hx-swap="innerHTML">
-                            🔄 Odśwież
-                        </button>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -228,6 +226,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="pagination-info">
+                            <div id="messages-info" class="text-muted"></div>
+                            <nav id="messages-pagination"></nav>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -235,14 +237,8 @@
             <!-- GROUPS TAB -->
             <div class="tab-pane fade" id="groups-pane" role="tabpanel">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="card-header">
                         <h5 class="mb-0">🔄 Status synchronizacji grup</h5>
-                        <button class="btn btn-sm btn-outline-primary" 
-                                hx-get="/api/groups" 
-                                hx-target="#groups-tbody"
-                                hx-swap="innerHTML">
-                            🔄 Odśwież
-                        </button>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -280,6 +276,10 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="pagination-info">
+                            <div id="groups-info" class="text-muted"></div>
+                            <nav id="groups-pagination"></nav>
+                        </div>
                     </div>
                     
                     <div class="card-body border-top">
@@ -310,127 +310,296 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Load messages when the messages tab is shown
-        document.getElementById('messages-tab').addEventListener('shown.bs.tab', function() {
-            htmx.ajax('GET', '/api/messages', {target: '#messages-tbody', swap: 'innerHTML'});
-        });
+        // Pagination state
+        const paginationState = {
+            leads: { currentPage: 1, perPage: 20 },
+            contacted: { currentPage: 1, perPage: 20 },
+            messages: { currentPage: 1, perPage: 20 },
+            groups: { currentPage: 1, perPage: 20 }
+        };
 
-        document.body.addEventListener('htmx:afterSwap', function(event) {
-            if (event.detail.target.id === 'leads-tbody') {
-                const data = JSON.parse(event.detail.xhr.response);
-                if (data.length === 0) {
-                    event.detail.target.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                Brak leadów do kontaktu
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    event.detail.target.innerHTML = data.map(lead => `
-                        <tr id="lead-${lead.post_id}">
-                            <td>${lead.author}</td>
-                            <td>
-                                <div class="post-content">${lead.content}</div>
-                            </td>
-                            <td class="text-nowrap">${lead.created_at}</td>
-                            <td>${lead.group_id}</td>
-                            <td class="text-nowrap">
-                                <button class="btn btn-sm btn-warning"
-                                        hx-post="/api/leads/${lead.post_id}/unmark"
-                                        hx-target="#lead-${lead.post_id}"
-                                        hx-swap="outerHTML"
-                                        hx-confirm="Odznaczyć ten lead?">
-                                    ✖️ Odznacz
-                                </button>
-                                <button class="btn btn-sm btn-danger"
-                                        hx-delete="/api/leads/${lead.post_id}"
-                                        hx-target="#lead-${lead.post_id}"
-                                        hx-swap="outerHTML"
-                                        hx-confirm="Usunąć ten lead?">
-                                    🗑️ Usuń
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                    htmx.process(event.detail.target);
-                }
+        // Helper function to create pagination HTML
+        function createPagination(page, totalPages, onPageClick) {
+            if (totalPages <= 1) return '';
+            
+            let html = '<ul class="pagination pagination-sm mb-0">';
+            
+            // Previous button
+            html += `<li class="page-item ${page === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${page - 1}">«</a>
+            </li>`;
+            
+            // Page numbers
+            const maxVisible = 5;
+            let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            
+            if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
             }
             
-            if (event.detail.target.id === 'groups-tbody') {
-                const data = JSON.parse(event.detail.xhr.response);
-                event.detail.target.innerHTML = data.map(group => `
+            if (startPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
+                if (startPage > 2) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<li class="page-item ${i === page ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+            }
+            
+            // Next button
+            html += `<li class="page-item ${page === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${page + 1}">»</a>
+            </li>`;
+            
+            html += '</ul>';
+            return html;
+        }
+
+        // Generic load function with pagination
+        async function loadData(endpoint, page, state) {
+            try {
+                const response = await fetch(`${endpoint}?page=${page}&per_page=${state.perPage}`);
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error(`Error loading ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // Load leads
+        async function loadLeads(page = 1) {
+            const result = await loadData('/api/leads', page, paginationState.leads);
+            if (!result) return;
+            
+            paginationState.leads.currentPage = page;
+            const tbody = document.getElementById('leads-tbody');
+            
+            if (result.data.length === 0) {
+                tbody.innerHTML = `
                     <tr>
-                        <td class="text-break small">${group.group_id}</td>
-                        <td class="text-nowrap small">${group.last_scrape_date}</td>
-                        <td>
-                            ${group.last_run_error ? 
-                                `<span class="badge error-badge" title="${group.last_error_message}">❌ Błąd</span>` :
-                                `<span class="badge success-badge">✅ OK</span>`
-                            }
+                        <td colspan="5" class="text-center text-muted py-4">
+                            Brak leadów do kontaktu
                         </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = result.data.map(lead => `
+                    <tr id="lead-${lead.post_id}">
+                        <td>${lead.author}</td>
+                        <td>
+                            <div class="post-content">${lead.content}</div>
+                        </td>
+                        <td class="text-nowrap">${lead.created_at}</td>
+                        <td>${lead.group_id}</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-warning"
+                                    hx-post="/api/leads/${lead.post_id}/unmark"
+                                    hx-target="closest tr"
+                                    hx-confirm="Odznaczyć ten lead?">
+                                ✖️ Odznacz
+                            </button>
+                            <button class="btn btn-sm btn-danger"
+                                    hx-delete="/api/leads/${lead.post_id}"
+                                    hx-target="closest tr"
+                                    hx-confirm="Usunąć ten lead?">
+                                🗑️ Usuń
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                htmx.process(tbody);
+            }
+            
+            // Update pagination info and controls
+            document.getElementById('leads-info').textContent = 
+                `Wyświetlam ${result.data.length > 0 ? ((page - 1) * result.per_page + 1) : 0}-${Math.min(page * result.per_page, result.total)} z ${result.total}`;
+            
+            const pagination = createPagination(page, result.total_pages, loadLeads);
+            document.getElementById('leads-pagination').innerHTML = pagination;
+            
+            // Add event listeners
+            document.querySelectorAll('#leads-pagination .page-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const newPage = parseInt(e.target.dataset.page);
+                    if (newPage && newPage !== page) loadLeads(newPage);
+                });
+            });
+        }
+
+        // Load contacted
+        async function loadContacted(page = 1) {
+            const result = await loadData('/api/contacted', page, paginationState.contacted);
+            if (!result) return;
+            
+            paginationState.contacted.currentPage = page;
+            const tbody = document.getElementById('contacted-tbody');
+            
+            if (result.data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            Brak skontaktowanych leadów
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = result.data.map(lead => `
+                    <tr id="contacted-${lead.post_id}">
+                        <td>${lead.author}</td>
+                        <td>
+                            <div class="post-content">${lead.content}</div>
+                        </td>
+                        <td class="text-nowrap">${lead.created_at}</td>
+                        <td>${lead.group_id}</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-success"
+                                    hx-post="/api/contacted/${lead.post_id}/reset"
+                                    hx-target="closest tr"
+                                    hx-confirm="Zresetować status kontaktu? Bot skontaktuje się ponownie.">
+                                🔄 Resetuj
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+                htmx.process(tbody);
+            }
+            
+            document.getElementById('contacted-info').textContent = 
+                `Wyświetlam ${result.data.length > 0 ? ((page - 1) * result.per_page + 1) : 0}-${Math.min(page * result.per_page, result.total)} z ${result.total}`;
+            
+            const pagination = createPagination(page, result.total_pages, loadContacted);
+            document.getElementById('contacted-pagination').innerHTML = pagination;
+            
+            document.querySelectorAll('#contacted-pagination .page-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const newPage = parseInt(e.target.dataset.page);
+                    if (newPage && newPage !== page) loadContacted(newPage);
+                });
+            });
+        }
+
+        // Load messages
+        async function loadMessages(page = 1) {
+            const result = await loadData('/api/messages', page, paginationState.messages);
+            if (!result) return;
+            
+            paginationState.messages.currentPage = page;
+            const tbody = document.getElementById('messages-tbody');
+            
+            if (result.data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            Brak wysłanych wiadomości
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = result.data.map(msg => `
+                    <tr>
+                        <td class="text-nowrap">${msg.sent_at}</td>
+                        <td>${msg.post_author}</td>
+                        <td>
+                            <div class="post-content small">${msg.post_content}</div>
+                        </td>
+                        <td>
+                            <div class="message-content">${msg.content}</div>
+                        </td>
+                        <td class="small">${msg.group_id}</td>
                     </tr>
                 `).join('');
             }
             
-            if (event.detail.target.id === 'contacted-tbody') {
-                const data = JSON.parse(event.detail.xhr.response);
-                if (data.length === 0) {
-                    event.detail.target.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                Brak skontaktowanych leadów
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    event.detail.target.innerHTML = data.map(lead => `
-                        <tr id="contacted-${lead.post_id}">
-                            <td>${lead.author}</td>
-                            <td>
-                                <div class="post-content">${lead.content}</div>
-                            </td>
-                            <td class="text-nowrap">${lead.created_at}</td>
-                            <td>${lead.group_id}</td>
-                            <td class="text-nowrap">
-                                <button class="btn btn-sm btn-success"
-                                        hx-post="/api/contacted/${lead.post_id}/reset"
-                                        hx-target="#contacted-${lead.post_id}"
-                                        hx-swap="outerHTML"
-                                        hx-confirm="Zresetować status kontaktu? Bot skontaktuje się ponownie.">
-                                    🔄 Resetuj
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                    htmx.process(event.detail.target);
-                }
-            }
+            document.getElementById('messages-info').textContent = 
+                `Wyświetlam ${result.data.length > 0 ? ((page - 1) * result.per_page + 1) : 0}-${Math.min(page * result.per_page, result.total)} z ${result.total}`;
             
-            if (event.detail.target.id === 'messages-tbody') {
-                const data = JSON.parse(event.detail.xhr.response);
-                if (data.length === 0) {
-                    event.detail.target.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted py-4">
-                                Brak wysłanych wiadomości
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    event.detail.target.innerHTML = data.map(msg => `
-                        <tr>
-                            <td class="text-nowrap">${msg.sent_at}</td>
-                            <td>${msg.post_author}</td>
-                            <td>
-                                <div class="post-content small">${msg.post_content}</div>
-                            </td>
-                            <td>
-                                <div class="message-content">${msg.content}</div>
-                            </td>
-                            <td class="small">${msg.group_id}</td>
-                        </tr>
-                    `).join('');
+            const pagination = createPagination(page, result.total_pages, loadMessages);
+            document.getElementById('messages-pagination').innerHTML = pagination;
+            
+            document.querySelectorAll('#messages-pagination .page-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const newPage = parseInt(e.target.dataset.page);
+                    if (newPage && newPage !== page) loadMessages(newPage);
+                });
+            });
+        }
+
+        // Load groups
+        async function loadGroups(page = 1) {
+            const result = await loadData('/api/groups', page, paginationState.groups);
+            if (!result) return;
+            
+            paginationState.groups.currentPage = page;
+            const tbody = document.getElementById('groups-tbody');
+            
+            tbody.innerHTML = result.data.map(group => `
+                <tr>
+                    <td class="text-break small">${group.group_id}</td>
+                    <td class="text-nowrap small">${group.last_scrape_date}</td>
+                    <td>
+                        ${group.last_run_error ? 
+                            `<span class="badge error-badge" title="${group.last_error_message}">❌ Błąd</span>` :
+                            `<span class="badge success-badge">✅ OK</span>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('groups-info').textContent = 
+                `Wyświetlam ${result.data.length > 0 ? ((page - 1) * result.per_page + 1) : 0}-${Math.min(page * result.per_page, result.total)} z ${result.total}`;
+            
+            const pagination = createPagination(page, result.total_pages, loadGroups);
+            document.getElementById('groups-pagination').innerHTML = pagination;
+            
+            document.querySelectorAll('#groups-pagination .page-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const newPage = parseInt(e.target.dataset.page);
+                    if (newPage && newPage !== page) loadGroups(newPage);
+                });
+            });
+        }
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLeads(1);
+        });
+
+        // Load data when tabs are shown
+        document.getElementById('contacted-tab').addEventListener('shown.bs.tab', function() {
+            loadContacted(paginationState.contacted.currentPage);
+        });
+        
+        document.getElementById('messages-tab').addEventListener('shown.bs.tab', function() {
+            loadMessages(paginationState.messages.currentPage);
+        });
+        
+        document.getElementById('groups-tab').addEventListener('shown.bs.tab', function() {
+            loadGroups(paginationState.groups.currentPage);
+        });
+
+        // Handle successful delete/unmark operations
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful) {
+                const target = event.detail.target;
+                if (target && target.tagName === 'TR') {
+                    target.remove();
+                    // Reload current page after deletion
+                    const activeTab = document.querySelector('.nav-link.active').id;
+                    if (activeTab === 'leads-tab') loadLeads(paginationState.leads.currentPage);
+                    if (activeTab === 'contacted-tab') loadContacted(paginationState.contacted.currentPage);
                 }
             }
         });

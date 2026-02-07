@@ -49,7 +49,7 @@ Struktura wiadomości:
 Dzień dobry, jestem doradcą w Alior Leasing.
 Piszę w odpowiedzi na post dotyczący finansowania Audi.
 Przyjąłem do wstępnej kalkulacji: cena 200k, wpłata 10%, okres 3 lata.
-Do przygotowania oferty będę potrzebował jeszcze informację o wysokości wykupu oraz numeru NIP i adresu e-mail.
+Do przygotowania oferty będę potrzebował jeszcze informację o wysokości wykupu oraz numeru NIP, adresu e-mail i numeru telefonu.
 Po otrzymaniu danych prześlę propozycję.
 Pozdrawiam.
 
@@ -59,7 +59,7 @@ Pozdrawiam.
 **Output:**
 Dzień dobry, jestem doradcą w Alior Leasing.
 Piszę w odpowiedzi na post dotyczący finansowania koparki.
-Do przygotowania oferty będę potrzebował parametrów leasingu (wpłata, okres, wykup), ceny maszyny oraz numeru NIP i adresu e-mail.
+Do przygotowania oferty będę potrzebował parametrów leasingu (wpłata, okres, wykup), ceny maszyny oraz numeru NIP, adresu e-mail i numeru telefonu.
 Po otrzymaniu danych prześlę propozycję.
 Pozdrawiam.
 """
