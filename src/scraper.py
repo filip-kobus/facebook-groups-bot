@@ -9,7 +9,7 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 from loguru import logger
-from src.config import MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE
+from src.config import MAX_POSTS_TO_SCAN, THINKING_TIME_SCALE, USERS_DIR
 
 load_dotenv()
 
@@ -17,11 +17,12 @@ load_dotenv()
 class FacebookScraper:
     """Handles Facebook authentication and post scraping with human-like behavior."""
     
-    def __init__(self, user: str = "scraper_user"):
+    def __init__(self, user: str = "scraper"):
         """
         Initialize Facebook scraper.
         """
-        self.user = user
+        self.user_dir = os.path.join(USERS_DIR, user)
+        os.makedirs(self.user_dir, exist_ok=True)
         self.max_posts_to_scan = MAX_POSTS_TO_SCAN
         self.thinking_time_scale = max(0, min(10, THINKING_TIME_SCALE))
         self.playwright = None
@@ -199,12 +200,11 @@ class FacebookScraper:
     async def init_browser(self) -> Tuple:
         """Initialize browser and authenticate."""
         self.playwright = await async_playwright().start()
-        user_data_dir = "fb_user_data"
 
         self.browser = await self.playwright.chromium.launch_persistent_context(
             headless=False,
             channel="chrome",
-            user_data_dir=user_data_dir,
+            user_data_dir=self.user_dir,
             args=[
                 '--disable-blink-features=AutomationControlled',
                 '--disable-dev-shm-usage',
