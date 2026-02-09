@@ -8,7 +8,6 @@ from loguru import logger
 
 @dataclass
 class BotConfig:
-    """Configuration for a single bot."""
     bot_id: str
     name: str
     description: str
@@ -18,6 +17,9 @@ class BotConfig:
     classification_prompt: str
     messaging_prompt: str
     target_group: Optional[Dict[str, str]] = None
+    max_posts_per_group: Optional[int] = None
+    max_messages_per_run: Optional[int] = None
+    initial_scrape_days: int = 1
     
     def __post_init__(self):
         """Validate configuration after initialization."""

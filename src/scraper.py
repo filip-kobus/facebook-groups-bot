@@ -15,15 +15,11 @@ load_dotenv()
 
 
 class FacebookScraper:
-    """Handles Facebook authentication and post scraping with human-like behavior."""
     
-    def __init__(self, user: str = "scraper"):
-        """
-        Initialize Facebook scraper.
-        """
+    def __init__(self, user: str = "scraper", max_posts_to_scan: int = None):
         self.user_dir = os.path.join(USERS_DIR, user)
         os.makedirs(self.user_dir, exist_ok=True)
-        self.max_posts_to_scan = MAX_POSTS_TO_SCAN
+        self.max_posts_to_scan = max_posts_to_scan if max_posts_to_scan is not None else MAX_POSTS_TO_SCAN
         self.thinking_time_scale = max(0, min(10, THINKING_TIME_SCALE))
         self.playwright = None
         self.browser = None

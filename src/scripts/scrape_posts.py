@@ -7,7 +7,6 @@ from src.database import init_db, SessionLocal, sync_groups_from_config
 from src.bot_config import get_bot_config, get_all_bot_configs
 
 async def scrape_bot(bot_id: str):
-    """Scrape groups for a specific bot."""
     bot_config = get_bot_config(bot_id)
     logger.info(f"Starting scrape for bot: {bot_config.name} ({bot_id})")
     
@@ -16,9 +15,17 @@ async def scrape_bot(bot_id: str):
     scraper = None
     try:
         async with SessionLocal() as db:
-            await sync_groups_from_config(db, bot_id, bot_config.groups)
+            await sync_groups_from_config(
+                db, 
+                bot_id, 
+                bot_config.groups, 
+                initial_scrape_days=bot_config.initial_scrape_days
+            )
             
-            scraper = FacebookScraper(user=bot_id)
+            scraper = FacebookScraper(
+                user=bot_id,
+                max_posts_to_scan=bot_config.max_posts_per_group
+            )
             processor = GroupProcessor(scraper, db, bot_id=bot_id)
             await processor.process_all_groups(bot_config.groups)
 

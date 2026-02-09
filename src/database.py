@@ -124,7 +124,7 @@ async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str,
     
     return False
 
-async def sync_groups_from_config(db: AsyncSession, bot_id: str, group_ids: List[str]) -> None:
+async def sync_groups_from_config(db: AsyncSession, bot_id: str, group_ids: List[str], initial_scrape_days: int = 1) -> None:
     from loguru import logger
     
     result = await db.execute(
@@ -138,7 +138,7 @@ async def sync_groups_from_config(db: AsyncSession, bot_id: str, group_ids: List
             new_group = Group(
                 group_id=group_id,
                 bot_id=bot_id,
-                last_scrape_date=datetime.datetime.now() - datetime.timedelta(days=7),
+                last_scrape_date=datetime.datetime.now() - datetime.timedelta(days=initial_scrape_days),
                 last_run_error=False
             )
             db.add(new_group)

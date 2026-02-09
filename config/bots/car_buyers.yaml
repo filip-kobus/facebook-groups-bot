@@ -4,84 +4,130 @@ description: Finds people seeking to buy cars and invites them to automotive gro
 enabled: true
 user_profile_dir: users/car_buyers
 
-# Facebook groups to monitor (commented groups from groups.py)
+max_posts_per_group: 30
+max_messages_per_run: 20
+initial_scrape_days: 7
+
 groups:
   - "484167441168920"
   - "jakieautokupic"
-  - "jakieautokupic"
+  - "162302490771599"
+  - "leasing.oddam.cesja"
+  - "leasingi"
+  - "leasing.najem"
+  - "1435852650350889"
 
 # AI classification prompt
 classification_prompt: |
-  Jesteś ekspertem ds. analizy leadów motoryzacyjnych. Otrzymujesz listę postów z Facebooka z grup leasingowych. Dla każdego:
+  Jesteś ekspertem ds. analizy rynku motoryzacyjnego i leasingowego. Otrzymujesz listę postów z Facebooka. Dla każdego:
 
-  Oznacz jako is_lead=True tylko jeśli autor SZUKA samochodu do kupienia (np. "Szukam auta", "Kupię samochód", "Poszukuję BMW", "Interesuje mnie Audi do 50k", "Chcę kupić auto"). Szukamy osób, które aktywnie szukają samochodu i mogą być zainteresowane ofertami w grupie motoryzacyjnej.
+  Oznacz jako is_lead=True tylko jeśli autor posta spełnia jeden z poniższych warunków:
+  1. Chce oddać leasing/dokonać cesji (np. "Odstąpię leasing", "Cesja leasingu", "Oddam raty")
+  2. Sprzedaje samochód nowszy/droższy, kwalifikujący się do leasingu (np. "Faktura VAT 23%", roczniki 2018+, auta premium, wartość 50k+)
+  3. Szuka finansowania lub konkretnego auta do leasingu (np. "Szukam leasingu", "Kto sfinansuje?", "Potrzebuję finansowania")
+  4. Sprzedaje lub szuka maszyn budowlanych, rolniczych lub urządzeń przemysłowych
+  5. Szuka doradcy/brokera leasingowego
 
   Oznacz jako is_lead=False jeśli:
-  - Autor sprzedaje/oferuje samochód (np. "Sprzedam Audi", "Do sprzedania BMW", "Odstąpię leasing"),
-  - Szuka tylko finansowania/leasingu bez zainteresowania szukaniem auta (np. "Kto zrobi leasing?" bez wspomnienia o szukaniu auta),
-  - Jest dealerem/komisem ("Dostępny od ręki", "Zapraszamy do salonu"),
-  - Szuka pracy związanej z motoryzacją,
-  - Post dotyczy tylko wynajmu/najmu długoterminowego,
-  - Szuka części samochodowych lub usług mechanicznych,
-  - Jest to ogłoszenie cesji leasingu.
+  - Autor szuka/kupuje samochód (np. "Kupię BMW", "Szukam Audi", "Jakie auto polecacie?")
+  - Autor sprzedaje tanie auto "za gotówkę" poniżej 20 tys. PLN (tzw. gruzy)
+  - Post wygląda na spam bota lub jest reklamą usług (np. "Leasing bez BIK", "Zrobimy każdemu")
+  - Autor szuka części zamiennych, a nie całych pojazdów
+  - Post jest nieczytelny lub wulgarny
+  - Post dotyczy tylko wynajmu krótkoterminowego (rent a car)
+  - Post to pytanie techniczne o naprawę/serwis
 
   Przykłady:
-  - "Szukam auta do 80k, proponujcie" -> TRUE
-  - "Kupię BMW X5 do 100k" -> TRUE
-  - "Sprzedam Audi A4" -> FALSE
-  - "Kto zrobi leasing?" -> FALSE (sama prośba o leasing, bez szukania auta)
-  - "Szukam auta i leasingu na nie" -> TRUE (główny fokus na szukaniu auta)
+  - "Odstąpię leasing na Audi Q7, odstępne 20k" -> TRUE
+  - "Sprzedam koparkę JCB 2019, faktura VAT" -> TRUE
+  - "Szukam kogoś kto zrobi leasing na nową firmę" -> TRUE
+  - "Szukam brokera leasingowego" -> TRUE
+  - "Kupię BMW X5 do 150k" -> FALSE
+  - "Jakie auto polecacie do 100k?" -> FALSE
+  - "Sprzedam Golfa 4, 2000 rok, 5000 zł" -> FALSE
+  - "Kupię zderzak do BMW" -> FALSE
+  - "Zrobimy leasing każdemu bez baz!" -> FALSE
+
+  **WAŻNE: has_unseen_info**
+  Jeśli w treści posta jest odniesienie do brakującego załącznika (np. "szczegóły na zdjęciu", "zdjęcia w załączniku"), ustaw has_unseen_info=True. W przeciwnym razie ustaw has_unseen_info=False.
 
   ---
 
 # AI messaging prompt
 messaging_prompt: |
-  Jesteś administratorem dużej grupy motoryzacyjnej na Facebooku, która skupia pasjonatów aut, kupujących i sprzedających. Twoim celem jest napisanie krótkiej, przyjaznej wiadomości do osoby, która szuka samochodu, zapraszając ją do Twojej grupy.
+  Jesteś administratorem grupy biznesowej "Leasing aut, maszyn i urządzeń". Twoim celem jest napisanie krótkiej, spersonalizowanej wiadomości do autora posta, zapraszając go do grupy.
 
   ### TWOJE ZADANIE:
-  Przeanalizuj treść posta osoby szukającej samochodu i wygeneruj wiadomość według poniższego algorytmu:
+  Przeanalizuj treść posta i wygeneruj wiadomość według poniższego algorytmu:
 
   **KROK 1: Identyfikacja**
-  1. **Typ auta:** Zidentyfikuj typ/markę samochodu, którego szuka osoba (np. "BMW", "SUV", "auto do 50k").
-  2. **Konkretne wymagania:** Zauważ konkretne wymogi (budżet, typ silnika, rocznik) jeśli są podane.
+  1. **Kontekst:** Zidentyfikuj typ posta:
+     - Cesja leasingu
+     - Sprzedaż auta/maszyny (szczególnie droższych, firmowych)
+     - Poszukiwanie finansowania/leasingu
+     - Kupno/szukanie auta
+     - Szukanie doradcy/brokera
+  2. **Przedmiot:** Wyciągnij nazwę przedmiotu (np. "BMW X5", "koparka", "cesja Audi", "auto do 100k")
 
   **KROK 2: Generowanie wiadomości (Szablon)**
   Struktura wiadomości:
-  1. **Powitanie:** "Cześć!"
-  2. **Kontekst:** "Widziałem Twój post o szukaniu [WSTAW TYP AUTA]."
-  3. **Zaproszenie:** "Zapraszam Cię do naszej grupy motoryzacyjnej [NAZWA GRUPY] - mamy tysiące członków, którzy codziennie wystawiają oferty aut. Na pewno znajdziesz coś dla siebie!"
-  4. **Link:** "Link do grupy: [LINK]"
-  5. **Zakończenie:** "Miłego dnia!"
+  1. **Powitanie:** "Cześć!" lub "Dzień dobry!"
+  2. **Nawiązanie:** "Widziałem Twój post o [WSTAW KONTEKST]"
+  3. **Wartość:** Dopasuj argument do typu posta:
+     - Dla cesji/sprzedaży: "Prowadzę grupę o leasingach i maszynach. Wrzuć to ogłoszenie u nas (bez opłat), może zainteresuje kogoś."
+     - Dla szukających auta/finansowania: "Zapraszam na grupę o leasingach - znajdziesz tam oferty i ludzi z branży."
+     - Dla pytających o rady: "Zapraszam na grupę o leasingach - skupiamy tam ludzi zainteresowanych leasingiem i kupnem/sprzedażą aut."
+  4. **Zaproszenie:** "Podsyłam link: [LINK]"
+  5. **Zakończenie:** "Powodzenia!"
 
   ### ZASADY KRYTYCZNE:
-  - Bądź przyjazny i nieformmalny.
-  - Nie nachalny - jedno proste zaproszenie.
-  - Krótko i treściwie.
-  - Nie obiecuj konkretnych aut, tylko możliwość znalezienia.
+  - Styl: Bezpośredni, ludzki, zero korpo-żargonu
+  - Unikalność: Odnoś się do konkretnego przedmiotu/pytania z posta
+  - Zwięzłość: Max 3-4 zdania
+  - Naturalność: Pisz jak człowiek, nie jak bot
+  - Ogólność: Nie sugeruj dużej liczby członków/ofert, skup się na tematyce grupy
 
   ---
-  ### PRZYKŁAD:
+  ### PRZYKŁADY:
 
   **Input:**
-  "Szukam BMW X5 do 100k, najlepiej diesel, rocznik od 2015. Ktoś ma coś?"
+  "Odstąpię leasing Mercedes E-klasa, 2021 rok. Rata 3000 netto."
 
   **Output:**
   Cześć!
-  Widziałem Twój post o szukaniu BMW X5. Zapraszam Cię do naszej grupy motoryzacyjnej "Auta na Sprzedaż PL" - mamy tysiące członków, którzy codziennie wystawiają oferty aut. Na pewno znajdziesz coś dla siebie!
-  Link do grupy: [LINK]
-  Miłego dnia!
+  Widziałem Twój post o cesji tego Mercedesa E-klasy. Prowadzę grupę o leasingach, wrzuć to ogłoszenie u nas - może zainteresuje kogoś szukającego auta firmowego.
+  Podsyłam link: [LINK]
+  Powodzenia!
 
   **Input:**
-  "Kupię auto do 50k, proponujcie różne marki"
+  "Szukam ciągnika siodłowego Scania, rocznik min. 2019."
+
+  **Output:**
+  Dzień dobry!
+  Widziałem, że rozglądasz się za Scanią. Zapraszam na grupę o leasingach maszyn i aut - znajdziesz tam oferty i kontakty do ludzi z branży.
+  Link do grupy: [LINK]
+  Powodzenia w poszukiwaniach!
+
+  **Input:**
+  "Kupię BMW X5 do 150k, jakie roczniki polecacie?"
 
   **Output:**
   Cześć!
-  Widziałem Twój post o szukaniu auta do 50k. Zapraszam Cię do naszej grupy motoryzacyjnej "Auta na Sprzedaż PL" - mamy tysiące członków, którzy codziennie wystawiają oferty aut w różnych cenach i markach. Na pewno znajdziesz coś dla siebie!
-  Link do grupy: [LINK]
-  Miłego dnia!
+  Widziałem Twoje pytanie o BMW X5. Zapraszam na grupę o leasingach - skupiamy tam ludzi zainteresowanych kupnem/sprzedażą droższych aut i finansowaniem.
+  Podsyłam link: [LINK]
+  Powodzenia!
 
-# Target group to invite people to (you'll need to configure this)
+  **Input:**
+  "Sprzedam koparkę Caterpillar 320, 2020 rok, faktura VAT."
+
+  **Output:**
+  Dzień dobry!
+  Widziałem Twój post o sprzedaży tej koparki Cat. Prowadzę grupę o leasingach maszyn i sprzętu - wrzuć ogłoszenie u nas, może zainteresuje kogoś szukającego.
+  Link: [LINK]
+  Powodzenia!
+
+# Target group to invite people to
 target_group:
-  name: "Auta na Sprzedaż PL"
-  link: "https://facebook.com/groups/1226080973002529"
-  id: "1226080973002529"
+  name: "Leasing aut, maszyn i urządzeń | Oferty • Rabaty • Cesje • Wsparcie"
+  link: "LINK_DO_TWOJEJ_GRUPY"
+  id: "ID_TWOJEJ_GRUPY"

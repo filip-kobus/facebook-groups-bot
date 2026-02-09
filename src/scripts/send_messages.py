@@ -8,7 +8,6 @@ from src.chatbot import Chatbot
 from src.bot_config import get_bot_config, get_all_bot_configs
 
 async def send_messages_for_bot(bot_id: str):
-    """Send messages to leads for a specific bot."""
     bot_config = get_bot_config(bot_id)
     logger.info(f"Starting message sending for bot: {bot_config.name} ({bot_id})")
     
@@ -26,6 +25,10 @@ async def send_messages_for_bot(bot_id: str):
                 Post.is_contacted == False,
                 Post.bot_id == bot_id
             )
+            
+            if bot_config.max_messages_per_run:
+                stmt = stmt.limit(bot_config.max_messages_per_run)
+            
             result = await db.execute(stmt)
             posts = result.scalars().all()
 
