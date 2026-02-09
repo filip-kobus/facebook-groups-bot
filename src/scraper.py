@@ -17,10 +17,11 @@ load_dotenv()
 class FacebookScraper:
     """Handles Facebook authentication and post scraping with human-like behavior."""
     
-    def __init__(self):
+    def __init__(self, user: str = "scraper_user"):
         """
         Initialize Facebook scraper.
         """
+        self.user = user
         self.max_posts_to_scan = MAX_POSTS_TO_SCAN
         self.thinking_time_scale = max(0, min(10, THINKING_TIME_SCALE))
         self.playwright = None

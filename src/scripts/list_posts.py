@@ -8,7 +8,8 @@ from src.database import SessionLocal, Post, Group
 async def list_leads():
     try:
         async with SessionLocal() as db:
-            stmt = select(Post).where(Post.is_lead == True, Post.is_contacted == False)
+            # stmt = select(Post).where(Post.is_lead == True, Post.is_contacted == False)
+            stmt=select(Post).where(Post.created_at >= datetime.datetime.now() - datetime.timedelta(days=1))
             result = await db.execute(stmt)
             leads = result.scalars().all()
 
@@ -16,11 +17,22 @@ async def list_leads():
                 logger.info("No messages sent in the last 24 hours.")
                 return
 
-            logger.info(f"Messages sent in the last 24 hours ({len(leads)}):")
-            for i, lead in enumerate(leads, 1):
-                print(f"\n--- Lead #{i} ---")
-                print(f"Author: {lead.author} (ID: {lead.user_id})")
-                print(f"Content: {lead.content}")
+            # Save to text file
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"logs/leads_{timestamp}.txt"
+            
+            logger.info(f"Messages sent in the last 24 hours ({len(leads)}), saving to {filename}")
+            
+            with open(filename, 'w') as f:
+                f.write(f"Messages sent in the last 24 hours ({len(leads)})\n")
+                f.write(f"Generated at: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("=" * 60 + "\n\n")
+                
+                for i, lead in enumerate(leads, 1):
+                    f.write(f"\n--- Lead #{i} ---\n")
+                    f.write(f"Author: {lead.author}\n")
+                    f.write(f"Date: {lead.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"Content: {lead.content}\n")
 
     except Exception as e:
         logger.exception(f"Fatal error in listing messages execution: {e}")
