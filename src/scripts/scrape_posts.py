@@ -1,29 +1,59 @@
 import asyncio
+import argparse
 from loguru import logger
 from src.scraper import FacebookScraper
 from src.group_processor import GroupProcessor
-from src.database import init_db, SessionLocal, get_groups
+from src.database import init_db, SessionLocal, sync_groups_from_config
+from src.bot_config import get_bot_config, get_all_bot_configs
 
-async def main():
-    """Main entry point for the Facebook groups lead scraper."""
-    await init_db()
+async def scrape_bot(bot_id: str):
+    """Scrape groups for a specific bot."""
+    bot_config = get_bot_config(bot_id)
+    logger.info(f"Starting scrape for bot: {bot_config.name} ({bot_id})")
+    
+    await init_db(bot_id=bot_id, group_ids=bot_config.groups)
     
     scraper = None
     try:
         async with SessionLocal() as db:
-            groups_ids = await get_groups(db)
-            scraper = FacebookScraper()
-            processor = GroupProcessor(scraper, db)
-            await processor.process_all_groups(groups_ids)
+            await sync_groups_from_config(db, bot_id, bot_config.groups)
+            
+            scraper = FacebookScraper(user=bot_id)
+            processor = GroupProcessor(scraper, db, bot_id=bot_id)
+            await processor.process_all_groups(bot_config.groups)
 
-            logger.success("All groups processed successfully!")
+            logger.success(f"All groups processed successfully for bot: {bot_id}!")
     except Exception as e:
-        logger.exception(f"Fatal error in main execution: {e}")
+        logger.exception(f"Fatal error in scraping for bot {bot_id}: {e}")
         raise
     finally:
         if scraper:
             await scraper.cleanup()
             logger.debug("Browser cleanup completed")
+
+async def main():
+    """Main entry point for the Facebook groups lead scraper."""
+    parser = argparse.ArgumentParser(description="Scrape Facebook groups for leads")
+    parser.add_argument(
+        "--bot",
+        type=str,
+        default="leasing",
+        help="Bot ID to run scraping for (default: leasing). Use 'all' to run for all enabled bots."
+    )
+    args = parser.parse_args()
+    
+    if args.bot == "all":
+        # Run for all enabled bots sequentially
+        bots = get_all_bot_configs(enabled_only=True)
+        logger.info(f"Running scraper for {len(bots)} enabled bots")
+        
+        for bot_config in bots:
+            logger.info(f"\n{'='*80}")
+            logger.info(f"Starting bot: {bot_config.name} ({bot_config.bot_id})")
+            logger.info(f"{'='*80}\n")
+            await scrape_bot(bot_config.bot_id)
+    else:
+        await scrape_bot(args.bot)
 
 
 if __name__ == "__main__":

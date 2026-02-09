@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
@@ -47,18 +47,24 @@ Przykłady:
 Jeśli w treści posta jest odniesienie do brakującego załącznika (np. "szczegóły na zdjęciu", "kalkulacja w załączniku"), ustaw has_unseen_info=True. W przeciwnym razie ustaw has_unseen_info=False. To pole jest opcjonalne i powinno być True tylko wtedy, gdy tekst sugeruje brakujące istotne informacje w załączniku.
 """
     
-    def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 5):
+    def __init__(self, model: str = 'openai:gpt-4.1', batch_size: int = 5, system_prompt: Optional[str] = None):
         """
         Initialize the lead analyzer.
         
         Args:
             model: AI model to use for analysis (default: gpt-4o for better accuracy)
             batch_size: Number of posts to analyze in each batch
+            system_prompt: Custom system prompt for classification (if None, uses default)
         """
         self.batch_size = batch_size
+        
+        # Use custom prompt if provided, otherwise use default
+        if system_prompt is None:
+            system_prompt = self.SYSTEM_PROMPT
+        
         self.agent = Agent(
             model,
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             output_type=BatchAnalysisResult,
         )
     

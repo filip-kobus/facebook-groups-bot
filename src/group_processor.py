@@ -15,9 +15,11 @@ class GroupProcessor:
         self,
         scraper: FacebookScraper,
         db: AsyncSession,
+        bot_id: str = "leasing",
     ):
         self.scraper = scraper
         self.db = db
+        self.bot_id = bot_id
     
     async def random_delay_between_groups(self):
         delay = random.uniform(2, 4)
@@ -26,14 +28,14 @@ class GroupProcessor:
     
     async def process_group(self, group_id: str):
         print(f"\n{'='*80}")
-        print(f"Processing group: {group_id}")
+        print(f"Processing group: {group_id} (bot: {self.bot_id})")
         print(f"{'='*80}\n")
         
         start_time = datetime.datetime.now()
-        latest_post_date = await get_last_scraping_date(self.db, group_id)
+        latest_post_date = await get_last_scraping_date(self.db, group_id, self.bot_id)
         
         result = await self.db.execute(
-            select(Group).where(Group.group_id == group_id)
+            select(Group).where(Group.group_id == group_id, Group.bot_id == self.bot_id)
         )
         group = result.scalars().first()
         
@@ -48,7 +50,8 @@ class GroupProcessor:
                     content=post_data["content"],
                     author=post_data["author"],
                     user_id=post_data["user_id"],
-                    group_id=group_id
+                    group_id=group_id,
+                    bot_id=self.bot_id
                 )
 
                 is_duplicate = await check_duplicate_post(self.db, post)
@@ -58,6 +61,8 @@ class GroupProcessor:
                     continue
                 self.db.add(post)
             
+            await self.db.commit()
+            
             group.last_scrape_date = start_time
             group.last_run_error = False
             group.last_error_message = None
@@ -66,6 +71,7 @@ class GroupProcessor:
             print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
             
         except Exception as e:
+            group.last_scrape_date = start_time
             os.makedirs("logs/screenshots", exist_ok=True)
             screenshot_path = f"logs/screenshots/error_{group_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             try:
@@ -74,7 +80,6 @@ class GroupProcessor:
             except Exception as screenshot_error:
                 logger.error(f"Failed to capture screenshot: {screenshot_error}")
             
-            group.last_scrape_date = start_time
             group.last_run_error = True
             group.last_error_message = str(e)
             await self.db.commit()

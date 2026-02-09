@@ -13,30 +13,35 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(request: Request, bot_id: str = Query(None)):
     async with SessionLocal() as session:
-        leads_result = await session.execute(
-            select(Post)
-            .where(Post.is_lead == True, Post.is_contacted == False)
-            .order_by(Post.created_at.desc())
-        )
+        # Build queries with optional bot filter
+        leads_query = select(Post).where(Post.is_lead == True, Post.is_contacted == False)
+        contacted_query = select(Post).where(Post.is_lead == True, Post.is_contacted == True)
+        groups_query = select(Group)
+        
+        if bot_id:
+            leads_query = leads_query.where(Post.bot_id == bot_id)
+            contacted_query = contacted_query.where(Post.bot_id == bot_id)
+            groups_query = groups_query.where(Group.bot_id == bot_id)
+        
+        leads_result = await session.execute(leads_query.order_by(Post.created_at.desc()))
         leads = leads_result.scalars().all()
         
-        contacted_result = await session.execute(
-            select(Post)
-            .where(Post.is_lead == True, Post.is_contacted == True)
-            .order_by(Post.created_at.desc())
-        )
+        contacted_result = await session.execute(contacted_query.order_by(Post.created_at.desc()))
         contacted = contacted_result.scalars().all()
         
-        groups_result = await session.execute(
-            select(Group).order_by(Group.group_id)
-        )
+        groups_result = await session.execute(groups_query.order_by(Group.group_id))
         groups = groups_result.scalars().all()
+        
+        # Get unique bot_ids for filter
+        bots_result = await session.execute(select(Post.bot_id).distinct())
+        available_bots = [b for b in bots_result.scalars().all() if b]
     
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "leads": leads, "contacted": contacted, "groups": groups}
+        {"request": request, "leads": leads, "contacted": contacted, "groups": groups,
+         "bot_id": bot_id, "available_bots": available_bots}
     )
 
 
@@ -67,24 +72,28 @@ async def delete_lead(post_id: str):
 
 
 @app.get("/api/leads")
-async def get_leads(page: int = Query(1, ge=1), per_page: int = Query(20, ge=1, le=100)):
+async def get_leads(page: int = Query(1, ge=1), per_page: int = Query(20, ge=1, le=100), bot_id: str = Query(None)):
     async with SessionLocal() as session:
         # Zlicz wszystkie leady
-        count_result = await session.execute(
-            select(func.count()).select_from(Post)
-            .where(Post.is_lead == True, Post.is_contacted == False)
+        count_query = select(func.count()).select_from(Post).where(
+            Post.is_lead == True, Post.is_contacted == False
         )
+        if bot_id:
+            count_query = count_query.where(Post.bot_id == bot_id)
+        
+        count_result = await session.execute(count_query)
         total = count_result.scalar()
         
         # Pobierz dane z paginacją
         offset = (page - 1) * per_page
-        result = await session.execute(
-            select(Post)
-            .where(Post.is_lead == True, Post.is_contacted == False)
-            .order_by(Post.created_at.desc())
-            .limit(per_page)
-            .offset(offset)
-        )
+        leads_query = select(Post).where(
+            Post.is_lead == True, Post.is_contacted == False
+        ).order_by(Post.created_at.desc()).limit(per_page).offset(offset)
+        
+        if bot_id:
+            leads_query = leads_query.where(Post.bot_id == bot_id)
+        
+        result = await session.execute(leads_query)
         leads = result.scalars().all()
     
     return JSONResponse({
@@ -95,6 +104,7 @@ async def get_leads(page: int = Query(1, ge=1), per_page: int = Query(20, ge=1, 
                 "content": lead.content[:200] + "..." if len(lead.content) > 200 else lead.content,
                 "created_at": lead.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "group_id": lead.group_id,
+                "bot_id": lead.bot_id,
             }
             for lead in leads
         ],

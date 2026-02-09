@@ -1,5 +1,5 @@
 from pydantic_ai import Agent
-from typing import Dict
+from typing import Dict, Optional
 
 
 class Chatbot:
@@ -64,17 +64,21 @@ Po otrzymaniu danych prześlę propozycję.
 Pozdrawiam.
 """
 
-    def __init__(self, model: str = 'openai:gpt-4.1'):
+    def __init__(self, model: str = 'openai:gpt-4.1', system_prompt: Optional[str] = None):
         """
         Initialize the lead analyzer.
         
         Args:
             model: AI model to use for analysis (default: gpt-4o for better accuracy)
-            batch_size: Number of posts to analyze in each batch
+            system_prompt: Custom system prompt for message generation (if None, uses default)
         """
+        # Use custom prompt if provided, otherwise use default
+        if system_prompt is None:
+            system_prompt = self.SYSTEM_PROMPT
+        
         self.agent = Agent(
             model,
-            system_prompt=self.SYSTEM_PROMPT,
+            system_prompt=system_prompt,
         )
     
     async def suggest_message(self, name: str, post: Dict) -> str:

@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, select, desc
 from src.groups import groups_ids
-from typing import Optional
+from typing import Optional, List
 from rapidfuzz import fuzz
 import datetime
 
@@ -23,6 +23,7 @@ class Post(Base):
     created_at = Column(DateTime, default=datetime.datetime.now)
     is_lead = Column(Boolean, default=None, nullable=True)
     is_contacted = Column(Boolean, default=False)
+    bot_id = Column(String, index=True, default="leasing")  # Bot identifier
     group_id = Column(String, ForeignKey("group.group_id"))
     group = relationship("Group", back_populates="posts")
     messages = relationship("Message", back_populates="post")
@@ -32,6 +33,7 @@ class Group(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     group_id = Column(String, unique=True, index=True)
+    bot_id = Column(String, index=True, default="leasing")  # Bot identifier
     last_scrape_date = Column(DateTime, default=datetime.datetime.now)
     last_run_error = Column(Boolean, default=False)
     last_error_message = Column(String, nullable=True)
@@ -46,50 +48,65 @@ class Message(Base):
     post_id = Column(String, ForeignKey("posts.post_id"))
     post = relationship("Post", back_populates="messages")
 
-async def init_db():
+async def init_db(bot_id: str = "leasing", group_ids: list = None):
+    """Initialize database tables and create groups for a specific bot."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    if group_ids is None:
+        group_ids = groups_ids
+    
     async with SessionLocal() as session:
         one_day_ago = datetime.datetime.now() - datetime.timedelta(days=1)
-        for group_id in groups_ids:
+        for group_id in group_ids:
             exists = await session.execute(
-                select(Group).where(Group.group_id == group_id)
+                select(Group).where(Group.group_id == group_id, Group.bot_id == bot_id)
             )
             if not exists.scalar_one_or_none():
-                session.add(Group(group_id=group_id, last_scrape_date=one_day_ago))
+                session.add(Group(group_id=group_id, bot_id=bot_id, last_scrape_date=one_day_ago))
         await session.commit()
 
 async def get_db():
     async with SessionLocal() as session:
         yield session
 
-async def get_last_scraping_date(db: AsyncSession, group_id: str) -> Optional[datetime.datetime]:
+async def get_last_scraping_date(db: AsyncSession, group_id: str, bot_id: str) -> Optional[datetime.datetime]:
     result = await db.execute(
         select(Group.last_scrape_date)
-        .where(Group.group_id == group_id)
+        .where(Group.group_id == group_id, Group.bot_id == bot_id)
         .limit(1)
     )
     return result.scalar_one_or_none()
 
-async def get_groups(db: AsyncSession):
-    result = await db.execute(select(Group.group_id))
+async def get_groups(db: AsyncSession, bot_id: Optional[str] = None):
+    if bot_id:
+        result = await db.execute(select(Group.group_id).where(Group.bot_id == bot_id))
+    else:
+        result = await db.execute(select(Group.group_id))
     return result.scalars().all()
 
-async def get_not_classified_posts(db: AsyncSession):
-    result = await db.execute(select(Post).where(Post.is_lead == None))
+async def get_not_classified_posts(db: AsyncSession, bot_id: Optional[str] = None):
+    query = select(Post).where(Post.is_lead == None)
+    if bot_id:
+        query = query.where(Post.bot_id == bot_id)
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def check_duplicate_post(db: AsyncSession, post: Post) -> bool:
     result = await db.execute(
-        select(Post).where(Post.content == post.content and Post.user_id == post.user_id)
+        select(Post).where(
+            Post.content == post.content, 
+            Post.user_id == post.user_id,
+            Post.bot_id == post.bot_id
+        )
     )
     existing_post = result.scalar_one_or_none()
     return existing_post is not None
 
-async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str, similarity_threshold: float = 80.0) -> bool:
+async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str, bot_id: str, similarity_threshold: float = 80.0) -> bool:
     result = await db.execute(
         select(Post)
-        .where(Post.user_id == user_id, Post.is_lead == True)
+        .where(Post.user_id == user_id, Post.is_lead == True, Post.bot_id == bot_id)
     )
     existing_lead_posts = result.scalars().all()
     
@@ -106,3 +123,25 @@ async def check_duplicate_lead(db: AsyncSession, user_id: str, new_content: str,
             return True
     
     return False
+
+async def sync_groups_from_config(db: AsyncSession, bot_id: str, group_ids: List[str]) -> None:
+    from loguru import logger
+    
+    result = await db.execute(
+        select(Group).where(Group.bot_id == bot_id)
+    )
+    existing_groups = {g.group_id: g for g in result.scalars().all()}
+    
+    for group_id in group_ids:
+        if group_id not in existing_groups:
+            logger.info(f"Creating new group record: {group_id} (bot: {bot_id})")
+            new_group = Group(
+                group_id=group_id,
+                bot_id=bot_id,
+                last_scrape_date=datetime.datetime.now() - datetime.timedelta(days=7),
+                last_run_error=False
+            )
+            db.add(new_group)
+    
+    await db.commit()
+    logger.info(f"Group sync complete for bot {bot_id}: {len(group_ids)} groups in config")
