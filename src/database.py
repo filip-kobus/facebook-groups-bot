@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
-from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, select, desc
+from sqlalchemy import Column, ForeignKey, Integer, String, Boolean, DateTime, select, desc, UniqueConstraint
 from src.groups import groups_ids
 from typing import Optional, List
 from rapidfuzz import fuzz
@@ -24,20 +24,22 @@ class Post(Base):
     is_lead = Column(Boolean, default=None, nullable=True)
     is_contacted = Column(Boolean, default=False)
     bot_id = Column(String, index=True, default="leasing")  # Bot identifier
-    group_id = Column(String, ForeignKey("group.group_id"))
-    group = relationship("Group", back_populates="posts")
+    group_id = Column(String, index=True)  # Linked to Group, but without FK constraint since (group_id, bot_id) is composite unique
     messages = relationship("Message", back_populates="post")
 
 class Group(Base):
     __tablename__ = "group"
 
     id = Column(Integer, primary_key=True, index=True)
-    group_id = Column(String, unique=True, index=True)
+    group_id = Column(String, index=True)
     bot_id = Column(String, index=True, default="leasing")  # Bot identifier
     last_scrape_date = Column(DateTime, default=datetime.datetime.now)
     last_run_error = Column(Boolean, default=False)
     last_error_message = Column(String, nullable=True)
-    posts = relationship("Post", back_populates="group")
+    
+    __table_args__ = (
+        UniqueConstraint('group_id', 'bot_id', name='uix_group_bot'),
+    )
 
 class Message(Base):
     __tablename__ = "messages"
