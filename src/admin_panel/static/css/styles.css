@@ -1,0 +1,157 @@
+/* Base styles */
+body { 
+    background-color: #f8f9fa; 
+}
+
+/* Card styles */
+.card { 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    margin-bottom: 1rem; 
+}
+
+/* Content display */
+.post-content { 
+    max-height: 150px; 
+    overflow-y: auto; 
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+.message-content {
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    background-color: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+/* Badges */
+.error-badge { 
+    background-color: #dc3545; 
+}
+
+.success-badge { 
+    background-color: #28a745; 
+}
+
+.bot-type-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    margin-left: 0.5rem;
+}
+
+/* Buttons */
+.btn-sm { 
+    font-size: 0.8rem; 
+}
+
+/* Navigation */
+.nav-tabs .nav-link.active { 
+    font-weight: bold; 
+}
+
+/* Job progress styles */
+.job-item {
+    background: white;
+    border-left: 4px solid #0d6efd;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+}
+
+.job-item.running { 
+    border-left-color: #0d6efd; 
+}
+
+.job-item.completed { 
+    border-left-color: #28a745; 
+}
+
+.job-item.failed { 
+    border-left-color: #dc3545; 
+}
+
+.job-item.cancelled { 
+    border-left-color: #6c757d; 
+}
+
+.progress { 
+    height: 25px; 
+}
+
+.progress-bar { 
+    font-size: 0.9rem; 
+    line-height: 25px; 
+}
+
+/* Bot selector */
+.bot-selector {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+/* Action buttons */
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+/* Stats cards */
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.stat-card h3 { 
+    margin: 0; 
+    font-size: 2rem; 
+}
+
+.stat-card p { 
+    margin: 0; 
+    opacity: 0.9; 
+}
+
+/* Empty states */
+.no-jobs {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.pulsing { 
+    animation: pulse 2s infinite; 
+}
+
+/* Pagination */
+.pagination-info {
+    padding: 1rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.pagination-info #leads-info,
+.pagination-info #contacted-info,
+.pagination-info #messages-info,
+.pagination-info #groups-info {
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+}

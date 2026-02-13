@@ -1,0 +1,43 @@
+<div class="bot-selector">
+    <div class="row align-items-center">
+        <div class="col-md-4">
+            <label for="botSelect" class="form-label fw-bold">
+                <i class="bi bi-robot"></i> Wybierz Bota:
+            </label>
+            <select id="botSelect" class="form-select" onchange="onBotChange()">
+                <option value="">Ładowanie...</option>
+            </select>
+        </div>
+        <div class="col-md-8">
+            <label class="form-label fw-bold">
+                <i class="bi bi-play-circle"></i> Akcje:
+            </label>
+            <div class="action-buttons">
+                <button class="btn btn-primary action-btn" onclick="startJob('scrape')" id="btn-scrape">
+                    <i class="bi bi-arrow-repeat"></i> Scrape
+                </button>
+                <button class="btn btn-info action-btn" onclick="startJob('classify')" id="btn-classify">
+                    <i class="bi bi-robot"></i> Classify
+                </button>
+                <button class="btn btn-success action-btn" onclick="startJob('process')" id="btn-process">
+                    <i class="bi bi-send"></i> Process
+                </button>
+                <button class="btn btn-warning action-btn" onclick="startJob('full')" id="btn-full">
+                    <i class="bi bi-lightning"></i> Full Run
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bot Info -->
+    <div id="botInfo" class="mt-3" style="display: none;">
+        <div class="alert alert-info mb-0">
+            <strong id="botName"></strong>
+            <span id="botType" class="bot-type-badge badge"></span>
+            <br>
+            <small id="botDescription" class="text-muted"></small>
+            <br>
+            <small><strong>Grupy:</strong> <span id="botGroups"></span></small>
+        </div>
+    </div>
+</div>

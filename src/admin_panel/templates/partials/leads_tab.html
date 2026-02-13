@@ -1,0 +1,59 @@
+<div class="tab-pane fade show active" id="leads-pane" role="tabpanel">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">🎯 Leady czekające na kontakt</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Autor</th>
+                            <th>Treść</th>
+                            <th>Data</th>
+                            <th>Grupa</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leads-tbody">
+                        {% for lead in leads %}
+                        <tr id="lead-{{ lead.post_id }}">
+                            <td>{{ lead.author }}</td>
+                            <td>
+                                <div class="post-content">{{ lead.content }}</div>
+                            </td>
+                            <td class="text-nowrap">{{ lead.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ lead.group_id }}</td>
+                            <td class="text-nowrap">
+                                <button class="btn btn-sm btn-warning"
+                                        hx-post="/api/leads/{{ lead.post_id }}/unmark"
+                                        hx-target="closest tr"
+                                        hx-confirm="Odznaczyć ten lead?">
+                                    ✖️ Odznacz
+                                </button>
+                                <button class="btn btn-sm btn-danger"
+                                        hx-delete="/api/leads/{{ lead.post_id }}"
+                                        hx-target="closest tr"
+                                        hx-confirm="Usunąć ten lead?">
+                                    🗑️ Usuń
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not leads %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                Brak leadów do kontaktu
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-info">
+                <div id="leads-info" class="text-muted"></div>
+                <nav id="leads-pagination"></nav>
+            </div>
+        </div>
+    </div>
+</div>

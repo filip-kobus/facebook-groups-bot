@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Facebook Groups Bot - Panel Admina{% endblock %}
+
+{% block content %}
+    <!-- Bot selector & actions -->
+    {% include 'components/bot_selector.html' %}
+    
+    <!-- Active Jobs -->
+    {% include 'components/active_jobs.html' %}
+    
+    <!-- Stats cards -->
+    {% include 'components/stats_cards.html' %}
+    
+    <!-- Tabs navigation -->
+    <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="leads-tab" data-bs-toggle="tab" data-bs-target="#leads-pane" 
+                    type="button" role="tab">
+                🎯 Leady do kontaktu ({{ leads|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="contacted-tab" data-bs-toggle="tab" data-bs-target="#contacted-pane" 
+                    type="button" role="tab">
+                ✅ Skontaktowane ({{ contacted|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages-pane" 
+                    type="button" role="tab">
+                💬 Wysłane Wiadomości
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="groups-tab" data-bs-toggle="tab" data-bs-target="#groups-pane" 
+                    type="button" role="tab">
+                🔄 Status Grup ({{ groups|length }})
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Tabs content -->
+    <div class="tab-content" id="mainTabsContent">
+        {% include 'partials/leads_tab.html' %}
+        {% include 'partials/contacted_tab.html' %}
+        {% include 'partials/messages_tab.html' %}
+        {% include 'partials/groups_tab.html' %}
+    </div>
+    
+    <!-- Modals -->
+    {% include 'components/scrape_date_modal.html' %}
+{% endblock %}
