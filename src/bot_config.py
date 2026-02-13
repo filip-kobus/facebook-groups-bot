@@ -1,9 +1,16 @@
 """Bot configuration loader for multi-bot architecture."""
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
 import yaml
 from loguru import logger
+
+
+class BotType(Enum):
+    """Type of bot determining its behavior."""
+    LEAD_BOT = "lead_bot"          # Finds leads, sends private messages
+    INVITER_BOT = "inviter_bot"    # Finds candidates, invites to group
 
 
 @dataclass
@@ -11,15 +18,26 @@ class BotConfig:
     bot_id: str
     name: str
     description: str
+    bot_type: str  # Will be converted to BotType enum
     enabled: bool
     user_profile_dir: str
     groups: List[str]
-    classification_prompt: str
-    messaging_prompt: str
-    target_group: Optional[Dict[str, str]] = None
+    
+    # Common settings
     max_posts_per_group: Optional[int] = None
-    max_messages_per_run: Optional[int] = None
     initial_scrape_days: int = 1
+    force_full_rescrape: bool = False  # If True, ignore last scrape date and scrape all posts
+    
+    # Lead bot specific (optional for inviter bots)
+    classification_prompt: Optional[str] = None
+    messaging_prompt: Optional[str] = None
+    max_messages_per_run: Optional[int] = None
+    
+    # Inviter bot specific (optional for lead bots)
+    invitation_criteria_prompt: Optional[str] = None
+    invitation_message_template: Optional[str] = None
+    target_group: Optional[Dict[str, str]] = None
+    max_invitations_per_run: Optional[int] = None
     
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -29,6 +47,36 @@ class BotConfig:
             raise ValueError(f"Bot {self.bot_id} must have at least one group")
         if not self.user_profile_dir:
             raise ValueError(f"Bot {self.bot_id} must have user_profile_dir")
+        
+        # Convert string to BotType enum
+        if isinstance(self.bot_type, str):
+            try:
+                self.bot_type = BotType(self.bot_type)
+            except ValueError:
+                raise ValueError(f"Invalid bot_type: {self.bot_type}. Must be 'lead_bot' or 'inviter_bot'")
+        
+        # Validate type-specific requirements
+        if self.bot_type == BotType.LEAD_BOT:
+            if not self.classification_prompt:
+                raise ValueError(f"Lead bot {self.bot_id} must have classification_prompt")
+            if not self.messaging_prompt:
+                raise ValueError(f"Lead bot {self.bot_id} must have messaging_prompt")
+        
+        elif self.bot_type == BotType.INVITER_BOT:
+            if not self.invitation_criteria_prompt:
+                raise ValueError(f"Inviter bot {self.bot_id} must have invitation_criteria_prompt")
+            if not self.target_group:
+                raise ValueError(f"Inviter bot {self.bot_id} must have target_group configuration")
+    
+    @property
+    def is_lead_bot(self) -> bool:
+        """Check if this is a lead bot."""
+        return self.bot_type == BotType.LEAD_BOT
+    
+    @property
+    def is_inviter_bot(self) -> bool:
+        """Check if this is an inviter bot."""
+        return self.bot_type == BotType.INVITER_BOT
 
 
 class BotConfigLoader:
@@ -114,6 +162,49 @@ class BotConfigLoader:
         """
         configs = self.get_all_bots(enabled_only=enabled_only)
         return [c.bot_id for c in configs]
+    
+    def save_bot(self, bot_id: str, config_data: dict) -> None:
+        """
+        Save bot configuration to YAML file.
+        
+        Args:
+            bot_id: Bot identifier
+            config_data: Configuration dictionary
+        """
+        yaml_path = self.config_dir / f"{bot_id}.yaml"
+        
+        with open(yaml_path, 'w', encoding='utf-8') as f:
+            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        
+        logger.info(f"Saved config for bot: {bot_id} to {yaml_path}")
+        
+        # Reload configuration
+        self.reload()
+    
+    def delete_bot(self, bot_id: str) -> None:
+        """
+        Delete bot configuration file.
+        
+        Args:
+            bot_id: Bot identifier
+        """
+        if bot_id not in self._configs:
+            raise KeyError(f"Bot '{bot_id}' not found")
+        
+        yaml_path = self.config_dir / f"{bot_id}.yaml"
+        
+        if yaml_path.exists():
+            yaml_path.unlink()
+            logger.info(f"Deleted config file: {yaml_path}")
+        
+        # Remove from memory
+        del self._configs[bot_id]
+    
+    def reload(self) -> None:
+        """Reload all configurations from disk."""
+        self._configs.clear()
+        self._load_all_configs()
+        logger.info("Reloaded all bot configurations")
 
 
 # Global loader instance

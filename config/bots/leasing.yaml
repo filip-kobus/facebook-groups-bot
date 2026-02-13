@@ -1,6 +1,7 @@
 bot_id: leasing
 name: Leasing Lead Bot
 description: Finds people seeking business leasing/financing and offers Alior Leasing services
+bot_type: lead_bot
 enabled: true
 user_profile_dir: users/leasing
 
@@ -10,6 +11,9 @@ groups:
   - leasingi
   - leasing.oddam.cesja
   - leasing.najem
+
+# Opcjonalne ustawienia scrapowania
+# force_full_rescrape: false  # Ustaw true aby ignorować datę ostatniego scrape'a i scrapować wszystkie posty
 
 # AI classification prompt
 classification_prompt: |

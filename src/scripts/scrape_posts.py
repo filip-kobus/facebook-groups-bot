@@ -26,7 +26,12 @@ async def scrape_bot(bot_id: str):
                 user=bot_id,
                 max_posts_to_scan=bot_config.max_posts_per_group
             )
-            processor = GroupProcessor(scraper, db, bot_id=bot_id)
+            processor = GroupProcessor(
+                scraper, 
+                db, 
+                bot_id=bot_id,
+                force_full_rescrape=bot_config.force_full_rescrape
+            )
             await processor.process_all_groups(bot_config.groups)
 
             logger.success(f"All groups processed successfully for bot: {bot_id}!")

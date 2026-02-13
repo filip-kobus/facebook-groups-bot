@@ -16,10 +16,12 @@ class GroupProcessor:
         scraper: FacebookScraper,
         db: AsyncSession,
         bot_id: str = "leasing",
+        force_full_rescrape: bool = False,
     ):
         self.scraper = scraper
         self.db = db
         self.bot_id = bot_id
+        self.force_full_rescrape = force_full_rescrape
     
     async def random_delay_between_groups(self):
         delay = random.uniform(2, 4)
@@ -32,7 +34,13 @@ class GroupProcessor:
         print(f"{'='*80}\n")
         
         start_time = datetime.datetime.now()
-        latest_post_date = await get_last_scraping_date(self.db, group_id, self.bot_id)
+        
+        # If force_full_rescrape is enabled, ignore last scrape date
+        if self.force_full_rescrape:
+            latest_post_date = None
+            logger.info(f"Force full rescrape enabled - ignoring last scrape date for group {group_id}")
+        else:
+            latest_post_date = await get_last_scraping_date(self.db, group_id, self.bot_id)
         
         result = await self.db.execute(
             select(Group).where(Group.group_id == group_id, Group.bot_id == self.bot_id)

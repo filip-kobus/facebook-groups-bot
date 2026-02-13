@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Facebook Groups Bot - Panel Admina</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         body { background-color: #f8f9fa; }
-        .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
         .post-content { 
             max-height: 150px; 
             overflow-y: auto; 
@@ -27,30 +28,175 @@
         .error-badge { background-color: #dc3545; }
         .success-badge { background-color: #28a745; }
         .btn-sm { font-size: 0.8rem; }
-        .nav-tabs .nav-link.active {
-            font-weight: bold;
-        }
-        .pagination {
-            margin-top: 1rem;
-        }
-        .pagination-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .nav-tabs .nav-link.active { font-weight: bold; }
+        
+        /* Job progress styles */
+        .job-item {
+            background: white;
+            border-left: 4px solid #0d6efd;
             padding: 1rem;
-            background-color: #f8f9fa;
-            border-top: 1px solid #dee2e6;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
         }
+        .job-item.running { border-left-color: #0d6efd; }
+        .job-item.completed { border-left-color: #28a745; }
+        .job-item.failed { border-left-color: #dc3545; }
+        .job-item.cancelled { border-left-color: #6c757d; }
+        
+        .progress { height: 25px; }
+        .progress-bar { font-size: 0.9rem; line-height: 25px; }
+        
+        /* Bot selector */
+        .bot-selector {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        .bot-type-badge {
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            margin-left: 0.5rem;
+        }
+        
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        /* Stats cards */
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .stat-card h3 { margin: 0; font-size: 2rem; }
+        .stat-card p { margin: 0; opacity: 0.9; }
+        
+        .no-jobs {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulsing { animation: pulse 2s infinite; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark bg-primary mb-4">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">📊 Facebook Groups Bot - Panel Admina</span>
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-robot"></i> Facebook Groups Bot - Panel Administracyjny
+            </span>
+            <span class="badge bg-light text-dark" id="connectionStatus">
+                <i class="bi bi-circle-fill text-success"></i> Połączony
+            </span>
         </div>
     </nav>
 
     <div class="container-fluid">
+        <!-- Bot Selector & Actions -->
+        <div class="bot-selector">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label for="botSelect" class="form-label fw-bold">
+                        <i class="bi bi-robot"></i> Wybierz Bota:
+                    </label>
+                    <select id="botSelect" class="form-select" onchange="onBotChange()">
+                        <option value="">Ładowanie...</option>
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-play-circle"></i> Akcje:
+                    </label>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary action-btn" onclick="startJob('scrape')" id="btn-scrape">
+                            <i class="bi bi-arrow-repeat"></i> Scrape
+                        </button>
+                        <button class="btn btn-info action-btn" onclick="startJob('classify')" id="btn-classify">
+                            <i class="bi bi-robot"></i> Classify
+                        </button>
+                        <button class="btn btn-success action-btn" onclick="startJob('process')" id="btn-process">
+                            <i class="bi bi-send"></i> Process
+                        </button>
+                        <button class="btn btn-warning action-btn" onclick="startJob('full')" id="btn-full">
+                            <i class="bi bi-lightning"></i> Full Run
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bot Info -->
+            <div id="botInfo" class="mt-3" style="display: none;">
+                <div class="alert alert-info mb-0">
+                    <strong id="botName"></strong>
+                    <span id="botType" class="bot-type-badge badge"></span>
+                    <br>
+                    <small id="botDescription" class="text-muted"></small>
+                    <br>
+                    <small><strong>Grupy:</strong> <span id="botGroups"></span></small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-gear-fill pulsing"></i> Aktywne Zadania
+                    <span class="badge bg-light text-dark ms-2" id="activeJobsCount">0</span>
+                </h5>
+            </div>
+            <div class="card-body" id="activeJobsContainer">
+                <div class="no-jobs">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p>Brak aktywnych zadań</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="row" id="statsRow">
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h3 id="statLeads">-</h3>
+                    <p><i class="bi bi-target"></i> Leady do Kontaktu</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <h3 id="statContacted">-</h3>
+                    <p><i class="bi bi-check-circle"></i> Skontaktowane</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <h3 id="statGroups">-</h3>
+                    <p><i class="bi bi-people"></i> Monitorowane Grupy</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <h3 id="statMessages">-</h3>
+                    <p><i class="bi bi-chat-dots"></i> Wysłane Wiadomości</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Tabs Navigation -->
         <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
             <li class="nav-item" role="presentation">
@@ -246,15 +392,18 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID Grupy</th>
+                                        <th>Bot ID</th>
                                         <th>Ostatni scraping</th>
                                         <th>Status</th>
+                                        <th>Akcje</th>
                                     </tr>
                                 </thead>
                                 <tbody id="groups-tbody">
                                     {% for group in groups %}
                                     <tr>
                                         <td class="text-break small">{{ group.group_id }}</td>
-                                        <td class="text-nowrap small">
+                                        <td class="text-nowrap small">{{ group.bot_id }}</td>
+                                        <td class="text-nowrap small" id="scrape-date-{{ group.bot_id }}-{{ group.group_id }}">
                                             {% if group.last_scrape_date %}
                                                 {{ group.last_scrape_date.strftime('%Y-%m-%d %H:%M') }}
                                             {% else %}
@@ -270,6 +419,12 @@
                                             {% else %}
                                                 <span class="badge success-badge">✅ OK</span>
                                             {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    onclick="openEditScrapeDate('{{ group.bot_id }}', '{{ group.group_id }}', '{{ group.last_scrape_date.isoformat() if group.last_scrape_date else '' }}')">
+                                                📅 Edytuj datę
+                                            </button>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -538,7 +693,9 @@
 
         // Load groups
         async function loadGroups(page = 1) {
-            const result = await loadData('/api/groups', page, paginationState.groups);
+            const botId = currentBot ? currentBot.bot_id : null;
+            const url = botId ? `/api/groups?bot_id=${botId}` : '/api/groups';
+            const result = await loadData(url, page, paginationState.groups);
             if (!result) return;
             
             paginationState.groups.currentPage = page;
@@ -547,12 +704,21 @@
             tbody.innerHTML = result.data.map(group => `
                 <tr>
                     <td class="text-break small">${group.group_id}</td>
-                    <td class="text-nowrap small">${group.last_scrape_date}</td>
+                    <td class="text-nowrap small">${group.bot_id}</td>
+                    <td class="text-nowrap small" id="scrape-date-${group.bot_id}-${group.group_id}">
+                        ${group.last_scrape_date !== 'Never' ? group.last_scrape_date.replace(' ', ' ').substring(0, 16) : 'Nigdy'}
+                    </td>
                     <td>
                         ${group.last_run_error ? 
                             `<span class="badge error-badge" title="${group.last_error_message}">❌ Błąd</span>` :
                             `<span class="badge success-badge">✅ OK</span>`
                         }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="openEditScrapeDate('${group.bot_id}', '${group.group_id}', '${group.last_scrape_date_iso}')">
+                            📅 Edytuj datę
+                        </button>
                     </td>
                 </tr>
             `).join('');
@@ -591,6 +757,307 @@
         });
 
         // Handle successful delete/unmark operations
+        // Bot Management & Job Control
+        let currentBot = null;
+        let eventSource = null;
+        
+        // Load available bots
+        async function loadBots() {
+            try {
+                const response = await fetch('/api/bots?enabled_only=false');
+                const data = await response.json();
+                const select = document.getElementById('botSelect');
+                
+                select.innerHTML = '<option value="">-- Wybierz bota --</option>';
+                data.bots.forEach(bot => {
+                    const option = document.createElement('option');
+                    option.value = bot.bot_id;
+                    option.textContent = `${bot.name} (${bot.bot_type})`;
+                    option.dataset.botType = bot.bot_type;
+                    select.appendChild(option);
+                });
+                
+                // Auto-select first enabled bot
+                const firstEnabled = data.bots.find(b => b.enabled);
+                if (firstEnabled) {
+                    select.value = firstEnabled.bot_id;
+                    onBotChange();
+                }
+            } catch (error) {
+                console.error('Failed to load bots:', error);
+                showNotification('Błąd ładowania botów', 'danger');
+            }
+        }
+        
+        // Bot change handler
+        async function onBotChange() {
+            const select = document.getElementById('botSelect');
+            const botId = select.value;
+            
+            if (!botId) {
+                document.getElementById('botInfo').style.display = 'none';
+                currentBot = null;
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/bots/${botId}`);
+                const bot = await response.json();
+                currentBot = bot;
+                
+                // Update bot info
+                document.getElementById('botName').textContent = bot.name;
+                document.getElementById('botDescription').textContent = bot.description;
+                document.getElementById('botGroups').textContent = bot.groups.length + ' grup';
+                
+                const typeBadge = document.getElementById('botType');
+                typeBadge.textContent = bot.bot_type === 'lead_bot' ? 'Lead Bot' : 'Inviter Bot';
+                typeBadge.className = `bot-type-badge badge ${bot.bot_type === 'lead_bot' ? 'bg-primary' : 'bg-success'}`;
+                
+                // Update process button text based on bot type
+                const processBtn = document.getElementById('btn-process');
+                processBtn.innerHTML = bot.bot_type === 'lead_bot' 
+                    ? '<i class="bi bi-send"></i> Send Messages'
+                    : '<i class="bi bi-person-plus"></i> Invite Users';
+                
+                document.getElementById('botInfo').style.display = 'block';
+                
+                // Reload stats for this bot
+                loadStats(botId);
+                
+                // Reload groups for this bot
+                loadGroups(1);
+            } catch (error) {
+                console.error('Failed to load bot details:', error);
+                showNotification('Błąd ładowania szczegółów bota', 'danger');
+            }
+        }
+        
+        // Start job
+        async function startJob(jobType) {
+            if (!currentBot) {
+                showNotification('Wybierz bota', 'warning');
+                return;
+            }
+            
+            const botId = currentBot.bot_id;
+            let endpoint = '';
+            
+            if (jobType === 'scrape') endpoint = `/api/bots/${botId}/scrape`;
+            else if (jobType === 'classify') endpoint = `/api/bots/${botId}/classify`;
+            else if (jobType === 'process') endpoint = `/api/bots/${botId}/process`;
+            else if (jobType === 'full') endpoint = `/api/bots/${botId}/run-full`;
+            
+            // Disable buttons
+            disableActionButtons(true);
+            
+            try {
+                const response = await fetch(endpoint, { method: 'POST' });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showNotification(`✓ Zadanie uruchomione: ${data.job_id.substring(0, 8)}...`, 'success');
+                } else {
+                    showNotification(`Błąd: ${data.detail || 'Unknown error'}`, 'danger');
+                    disableActionButtons(false);
+                }
+            } catch (error) {
+                console.error('Failed to start job:', error);
+                showNotification('Błąd uruchamiania zadania', 'danger');
+                disableActionButtons(false);
+            }
+        }
+        
+        // Disable/enable action buttons
+        function disableActionButtons(disabled) {
+            ['btn-scrape', 'btn-classify', 'btn-process', 'btn-full'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = disabled;
+            });
+        }
+        
+        // Cancel job
+        async function cancelJob(jobId) {
+            if (!confirm('Czy na pewno anulować to zadanie?')) return;
+            
+            try {
+                const response = await fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' });
+                if (response.ok) {
+                    showNotification('✓ Zadanie anulowane', 'info');
+                } else {
+                    showNotification('Nie udało się anulować zadania', 'danger');
+                }
+            } catch (error) {
+                console.error('Failed to cancel job:', error);
+                showNotification('Błąd anulowania zadania', 'danger');
+            }
+        }
+        
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const container = document.createElement('div');
+            container.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+            container.style.zIndex = '9999';
+            container.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(container);
+            
+            setTimeout(() => container.remove(), 5000);
+        }
+        
+        // Load stats
+        async function loadStats(botId) {
+            try {
+                // Leads count
+                const leadsResp = await fetch(`/api/leads?per_page=1&bot_id=${botId || ''}`);
+                const leadsData = await leadsResp.json();
+                document.getElementById('statLeads').textContent = leadsData.total || 0;
+                
+                // Contacted count  
+                const contactedResp = await fetch(`/api/contacted?per_page=1`);
+                const contactedData = await contactedResp.json();
+                document.getElementById('statContacted').textContent = contactedData.total || 0;
+                
+                // Groups count
+                const groupsResp = await fetch(`/api/groups?per_page=1`);
+                const groupsData = await groupsResp.json();
+                document.getElementById('statGroups').textContent = groupsData.total || 0;
+                
+                // Messages count
+                const messagesResp = await fetch(`/api/messages?per_page=1`);
+                const messagesData = await messagesResp.json();
+                document.getElementById('statMessages').textContent = messagesData.total || 0;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+        
+        // Render active jobs
+        function renderActiveJobs(jobs) {
+            const container = document.getElementById('activeJobsContainer');
+            const count = document.getElementById('activeJobsCount');
+            
+            if (!jobs || jobs.length === 0) {
+                container.innerHTML = `
+                    <div class="no-jobs">
+                        <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                        <p>Brak aktywnych zadań</p>
+                    </div>
+                `;
+                count.textContent = '0';
+                disableActionButtons(false);
+                return;
+            }
+            
+            count.textContent = jobs.length;
+            
+            container.innerHTML = jobs.map(job => {
+                const progressPercent = Math.round(job.progress || 0);
+                const statusIcon = {
+                    'pending': 'hourglass-split',
+                    'running': 'arrow-repeat',
+                    'completed': 'check-circle',
+                    'failed': 'x-circle',
+                    'cancelled': 'dash-circle'
+                }[job.status] || 'question-circle';
+                
+                const statusColor = {
+                    'pending': 'secondary',
+                    'running': 'primary',
+                    'completed': 'success',
+                    'failed': 'danger',
+                    'cancelled': 'secondary'
+                }[job.status] || 'info';
+                
+                return `
+                    <div class="job-item ${job.status}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>${job.bot_id}</strong>
+                                <span class="badge bg-${statusColor} ms-2">
+                                    <i class="bi bi-${statusIcon}"></i> ${job.job_type}
+                                </span>
+                            </div>
+                            <div>
+                                <small class="text-muted">${new Date(job.started_at).toLocaleTimeString()}</small>
+                                ${job.status === 'running' ? `
+                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="cancelJob('${job.job_id}')">
+                                        <i class="bi bi-stop-circle"></i> Anuluj
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped ${job.status === 'running' ? 'progress-bar-animated' : ''} bg-${statusColor}" 
+                                 style="width: ${progressPercent}%">
+                                ${progressPercent}%
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Disable action buttons if there are running jobs for current bot
+            const hasRunningJob = jobs.some(j => j.status === 'running' && j.bot_id === currentBot?.bot_id);
+            disableActionButtons(hasRunningJob);
+        }
+        
+        // Setup SSE for live updates
+        function setupLiveUpdates() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource('/api/jobs/stream');
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.jobs) {
+                        renderActiveJobs(data.jobs);
+                    }
+                } catch (error) {
+                    console.error('SSE parse error:', error);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE error:', error);
+                document.getElementById('connectionStatus').innerHTML = '<i class="bi bi-circle-fill text-danger"></i> Rozłączony';
+                
+                // Retry connection after 5 seconds
+                setTimeout(() => {
+                    console.log('Reconnecting SSE...');
+                    setupLiveUpdates();
+                }, 5000);
+            };
+            
+            eventSource.onopen = function() {
+                document.getElementById('connectionStatus').innerHTML = '<i class="bi bi-circle-fill text-success"></i> Połączony';
+            };
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBots();
+            loadStats();
+            setupLiveUpdates();
+            
+            // Refresh stats every 30 seconds
+            setInterval(() => {
+                if (currentBot) loadStats(currentBot.bot_id);
+            }, 30000);
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+
         document.body.addEventListener('htmx:afterRequest', function(event) {
             if (event.detail.successful) {
                 const target = event.detail.target;
@@ -603,6 +1070,118 @@
                 }
             }
         });
+
+        // Group scrape date editing
+        let currentEditGroup = { botId: null, groupId: null };
+
+        function openEditScrapeDate(botId, groupId, currentDate) {
+            currentEditGroup = { botId, groupId };
+            
+            // Convert ISO date to datetime-local format (YYYY-MM-DDTHH:mm)
+            let dateValue = '';
+            if (currentDate) {
+                const date = new Date(currentDate);
+                dateValue = date.toISOString().slice(0, 16);
+            } else {
+                // Default to 7 days ago
+                const date = new Date();
+                date.setDate(date.getDate() - 7);
+                dateValue = date.toISOString().slice(0, 16);
+            }
+            
+            document.getElementById('scrapeDateInput').value = dateValue;
+            document.getElementById('editGroupInfo').textContent = `Bot: ${botId}, Grupa: ${groupId}`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('editScrapeDateModal'));
+            modal.show();
+        }
+
+        async function saveScrapeDate() {
+            const newDate = document.getElementById('scrapeDateInput').value;
+            
+            if (!newDate) {
+                alert('Proszę wybrać datę');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/groups/${currentEditGroup.botId}/${currentEditGroup.groupId}/scrape-date`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        scrape_date: new Date(newDate).toISOString()
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Błąd podczas aktualizacji daty');
+                }
+                
+                const result = await response.json();
+                
+                // Update UI
+                const dateCell = document.getElementById(`scrape-date-${currentEditGroup.botId}-${currentEditGroup.groupId}`);
+                if (dateCell) {
+                    const formattedDate = new Date(result.new_scrape_date).toLocaleString('pl-PL', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }).replace(',', '');
+                    dateCell.textContent = formattedDate;
+                }
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editScrapeDateModal'));
+                modal.hide();
+                
+                alert('Data została zaktualizowana pomyślnie');
+            } catch (error) {
+                alert(`Błąd: ${error.message}`);
+            }
+        }
+
+        function setQuickDate(daysAgo) {
+            const date = new Date();
+            date.setDate(date.getDate() - daysAgo);
+            document.getElementById('scrapeDateInput').value = date.toISOString().slice(0, 16);
+        }
     </script>
+
+    <!-- Edit Scrape Date Modal -->
+    <div class="modal fade" id="editScrapeDateModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📅 Edytuj datę ostatniego scrapowania</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small" id="editGroupInfo"></p>
+                    <div class="mb-3">
+                        <label for="scrapeDateInput" class="form-label">Ostatni scraping:</label>
+                        <input type="datetime-local" class="form-control" id="scrapeDateInput">
+                        <div class="form-text">Ustawienie wcześniejszej daty spowoduje rescraping postów od tej daty</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Szybki wybór:</label>
+                        <div class="btn-group d-flex" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickDate(1)">1 dzień temu</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickDate(7)">7 dni temu</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickDate(30)">30 dni temu</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-primary" onclick="saveScrapeDate()">Zapisz</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

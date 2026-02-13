@@ -295,73 +295,49 @@ class FacebookScraper:
         cutoff_time = datetime.now() - timedelta(hours=hours)
         return post_date < cutoff_time
 
-    async def scrape_posts(self, group_id: str, latest_post_date: Optional[datetime] = None) -> List[Dict]:
-        await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
-        await self.random_delay(1, 2)
-        await self.close_notification_popup()
-
+    async def _extract_author_name(self, post) -> Optional[str]:
+        """Extract author name from a post."""
+        author_locator = post.locator('b').first
         try:
-            await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=3000)
-        except Exception as e:
-            logger.debug(f"Timeout waiting for posts to load: {e}")
-        
-        await self.human_like_scroll()
-        await self.random_delay(1, 2)
-        posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
-        number_of_posts = len(posts)
-        logger.debug(f"Found {number_of_posts} total posts in DOM")
-        current_index = 0
-        scraped_posts = 0
-        data_postu = None
-        dane_z_postu = []
-        old_posts_streak = 0
-
-        while True:
-            if current_index >= number_of_posts - 2:
-                await self.human_like_scroll()
-                await self.random_delay(1, 2)
-                posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
-                number_of_posts = len(posts)
-                logger.debug(f"Found {number_of_posts} total posts in DOM")
-
+            await author_locator.scroll_into_view_if_needed(timeout=1000)
+            await author_locator.is_visible(timeout=1000)
             await self.random_delay(1, 2)
-            post = posts[current_index]
+            author_name = await author_locator.inner_text(timeout=1000)
             
-            try:
-                await post.is_visible(timeout=1000)
-                await post.scroll_into_view_if_needed(timeout=1000)
-            except:
-                logger.debug("Failed to scroll to post, skipping")
-                current_index += 1
-                continue
-            author_locator = post.locator('b').first
-            try:
-                await author_locator.scroll_into_view_if_needed(timeout=1000)
-                await author_locator.is_visible(timeout=1000)
-                await self.random_delay(1, 2)
-                author_name = await author_locator.inner_text(timeout=1000)
-            except Exception as e:
-                logger.debug(f"Failed to extract author name: {e}, skipping post")
-                current_index += 1
-                continue
-
             if "Anonymous" in author_name or "Anonimowy" in author_name:
                 logger.debug("Skipping anonymous post")
-                current_index += 1
-                continue
+                return None
+            
+            return author_name
+        except Exception as e:
+            logger.debug(f"Failed to extract author name: {e}")
+            return None
 
-            await author_locator.scroll_into_view_if_needed(timeout=1000)
+    async def _extract_user_id(self, post) -> Optional[str]:
+        """Extract user ID from a post."""
+        try:
             available_links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
+            if not available_links:
+                return None
+            
             await self.random_delay(0.2, 0.5)
             participant_anchor_link = await available_links[0].get_attribute("href", timeout=1000)
             participant_id = participant_anchor_link.split("user/")[1].split("/")[0]
+            return participant_id
+        except Exception as e:
+            logger.debug(f"Failed to extract user ID: {e}")
+            return None
 
+    async def _extract_post_date(self, post) -> Optional[str]:
+        """Extract post date by hovering over links and reading tooltips."""
+        try:
+            available_links = await post.locator('a[attributionsrc^="/privacy_sandbox/"]').all()
+            
             for link in available_links[1:5]:
                 try:
                     if not await link.is_visible():
                         continue
                     
-                    # await link.scroll_into_view_if_needed(timeout=1000)
                     await self.random_delay(0.1, 0.7)
                     await link.hover(timeout=1000)
                     
@@ -372,36 +348,25 @@ class FacebookScraper:
                     has_time = re.search(r'\d{1,2}:\d{2}', tooltip_text)
                     has_day = re.search(r'\b\d{1,2}\b', tooltip_text)
                     if has_time or has_day:
-                        data_postu = tooltip_text
                         logger.debug(f"Found tooltip with date/time: {tooltip_text}")
-                        break
+                        return tooltip_text
                     else:
                         logger.debug(f"Tooltip does not contain date/time: {tooltip_text}")
                 except Exception as e:
                     logger.debug(f"Failed to hover or get tooltip: {str(e)}")
                     continue
-            
-            if data_postu:
-                parsed_date = self.parse_facebook_date(data_postu)
-                if latest_post_date and parsed_date and parsed_date < latest_post_date:
-                    old_posts_streak += 1
-                    logger.debug(f"Post date {data_postu} is older than latest in DB ({latest_post_date}), streak: {old_posts_streak}/3")
-                    if old_posts_streak >= 3:
-                        logger.debug(f"Found 3 old posts in a row, stopping")
-                        break
-                    current_index += 1
-                    continue
-                else:
-                    old_posts_streak = 0
-            await post.scroll_into_view_if_needed(timeout=1000)
-            await self.random_delay(0.2, 0.5)
-            logger.debug(f"Processing initial post at index {current_index}")
-            
+        except Exception as e:
+            logger.debug(f"Failed to extract post date: {e}")
+        
+        return None
+
+    async def _extract_post_content(self, post) -> Optional[str]:
+        """Extract post content and expand 'See more' if needed."""
+        try:
             text_locator = post.locator('[data-ad-rendering-role="story_message"]')
             if not await text_locator.count():
-                logger.debug("No text content found in post, skipping")
-                current_index += 1
-                continue
+                logger.debug("No text content found in post")
+                return None
             
             post_text = await text_locator.first.inner_text()
             expand_name = "See more" if "See more" in post_text else "Zobacz więcej"
@@ -419,28 +384,142 @@ class FacebookScraper:
                         await self.human_like_scroll()
                 except Exception as e:
                     logger.debug(f"Failed to click 'See more' button: {e}")
+            
+            return post_text
+        except Exception as e:
+            logger.debug(f"Failed to extract post content: {e}")
+            return None
 
-            current_index += 1
+    def _should_stop_for_old_post(self, parsed_date: Optional[datetime], 
+                                   latest_post_date: Optional[datetime], 
+                                   old_posts_streak: int) -> Tuple[bool, int]:
+        """Check if scraping should stop due to old posts. Returns (should_stop, new_streak)."""
+        if not parsed_date or not latest_post_date:
+            return False, 0
+        
+        if parsed_date < latest_post_date:
+            old_posts_streak += 1
+            logger.debug(f"Post is older than latest in DB ({latest_post_date}), streak: {old_posts_streak}/3")
+            if old_posts_streak >= 3:
+                logger.debug(f"Found 3 old posts in a row, stopping")
+                return True, old_posts_streak
+            return False, old_posts_streak
+        
+        return False, 0
 
-            print(f"\n{'─'*80}")
-            print(f"📝 POST #{len(dane_z_postu) + 1}")
-            print(f"👤 Author: {author_name}")
-            print(f"📅 Date: {data_postu or 'N/A'}")
-            print(f"💬 Content:\n{post_text[:300]}{'...' if len(post_text) > 300 else ''}")
+    def _print_post_info(self, post_number: int, author_name: str, date: Optional[str], content: str):
+        """Print formatted post information."""
+        print(f"\n{'─'*80}")
+        print(f"📝 POST #{post_number}")
+        print(f"👤 Author: {author_name}")
+        print(f"📅 Date: {date or 'N/A'}")
+        print(f"💬 Content:\n{content[:300]}{'...' if len(content) > 300 else ''}")
 
-            scraped_posts += 1
-            if scraped_posts >= self.max_posts_to_scan:
-                logger.debug(f"Reached max posts to scan: {self.max_posts_to_scan}, stopping")
-                break
+    async def scrape_posts(self, group_id: str, latest_post_date: Optional[datetime] = None) -> List[Dict]:
+        """Scrape posts from a Facebook group."""
+        await self.page.goto(f"https://www.facebook.com/groups/{group_id}/?sorting_setting=CHRONOLOGICAL")
+        await self.random_delay(1, 2)
+        await self.close_notification_popup()
 
-            dane_z_postu.append({
-                "id": f"{group_id}_{participant_id}_{int(time.time())}",
-                "author": author_name,
-                "user_id": participant_id,
-                "content": post_text,
-                "date": data_postu,
-                "group_id": group_id
-            })
+        try:
+            await self.page.wait_for_selector('[role="feed"] [aria-posinset]', timeout=3000)
+        except Exception as e:
+            logger.debug(f"Timeout waiting for posts to load: {e}")
+        
+        await self.human_like_scroll()
+        await self.random_delay(1, 2)
+        posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+        number_of_posts = len(posts)
+        logger.debug(f"Found {number_of_posts} total posts in DOM")
+        
+        current_index = 0
+        scraped_posts = 0
+        dane_z_postu = []
+        old_posts_streak = 0
+
+        try:
+            while True:
+                # Scroll and refresh posts list if near the end
+                if current_index >= number_of_posts - 2:
+                    await self.human_like_scroll()
+                    await self.random_delay(1, 2)
+                    posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
+                    number_of_posts = len(posts)
+                    logger.debug(f"Found {number_of_posts} total posts in DOM")
+
+                await self.random_delay(1, 2)
+                post = posts[current_index]
+                
+                # Scroll to post
+                try:
+                    await post.is_visible(timeout=1000)
+                    await post.scroll_into_view_if_needed(timeout=1000)
+                except:
+                    logger.debug("Failed to scroll to post, skipping")
+                    current_index += 1
+                    continue
+
+                # Extract author name
+                author_name = await self._extract_author_name(post)
+                if not author_name:
+                    current_index += 1
+                    continue
+
+                # Extract user ID
+                participant_id = await self._extract_user_id(post)
+                if not participant_id:
+                    logger.debug("Failed to extract user ID, skipping")
+                    current_index += 1
+                    continue
+
+                # Extract post date
+                data_postu = await self._extract_post_date(post)
+                
+                # Check if post is too old
+                if data_postu:
+                    parsed_date = self.parse_facebook_date(data_postu)
+                    should_stop, old_posts_streak = self._should_stop_for_old_post(
+                        parsed_date, latest_post_date, old_posts_streak
+                    )
+                    if should_stop:
+                        break
+                    if old_posts_streak > 0:
+                        current_index += 1
+                        continue
+
+                # Extract post content
+                await post.scroll_into_view_if_needed(timeout=1000)
+                await self.random_delay(0.2, 0.5)
+                logger.debug(f"Processing post at index {current_index}")
+                
+                post_text = await self._extract_post_content(post)
+                if not post_text:
+                    current_index += 1
+                    continue
+
+                # Print post info
+                self._print_post_info(len(dane_z_postu) + 1, author_name, data_postu, post_text)
+
+                # Add to results
+                dane_z_postu.append({
+                    "id": f"{group_id}_{participant_id}_{int(time.time())}",
+                    "author": author_name,
+                    "user_id": participant_id,
+                    "content": post_text,
+                    "date": data_postu,
+                    "group_id": group_id
+                })
+
+                current_index += 1
+                scraped_posts += 1
+                
+                # Check if reached max posts
+                if scraped_posts >= self.max_posts_to_scan:
+                    logger.debug(f"Reached max posts to scan: {self.max_posts_to_scan}, stopping")
+                    break
+
+        except Exception as e:
+            logger.error(f"Error during scraping: {e}. Returning {len(dane_z_postu)} posts collected so far.")
         
         return dane_z_postu
     
