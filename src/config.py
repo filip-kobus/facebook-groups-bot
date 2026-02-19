@@ -1,4 +1,4 @@
-MAX_POSTS_TO_SCAN = 10000
+MAX_POSTS_TO_SCAN = 50
 
 # Thinking time scale (0-10):
 # 10 = 5 seconds, 1 = 0.5 seconds, 0 = 0 seconds

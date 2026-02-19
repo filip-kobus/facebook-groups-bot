@@ -79,7 +79,6 @@ class GroupProcessor:
             print(f"\nGroup {group_id} complete: {number_of_new_posts} new posts saved.")
             
         except Exception as e:
-            group.last_scrape_date = start_time
             os.makedirs("logs/screenshots", exist_ok=True)
             screenshot_path = f"logs/screenshots/error_{group_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             try:

@@ -24,28 +24,28 @@ help:
 	@echo "  make sync-status   - Wyświetla czas od ostatniej synchronizacji dla każdej grupy."
 
 # Wszystkie boty naraz
-scrape:
-	@echo "Uruchamianie scrapowania dla wszystkich botów..."
-	uv run python -m src.scripts.scrape_posts --bot all
+# scrape:
+# 	@echo "Uruchamianie scrapowania dla wszystkich botów..."
+# 	uv run python -m src.scripts.scrape_posts --bot all
 
-classify:
-	@echo "Uruchamianie klasyfikacji dla wszystkich botów..."
-	uv run python -m src.scripts.classify_posts --bot all
+# classify:
+# 	@echo "Uruchamianie klasyfikacji dla wszystkich botów..."
+# 	uv run python -m src.scripts.classify_posts --bot all
 
-send-messages:
-	@echo "Uruchamianie wysyłania wiadomości dla wszystkich botów..."
-	uv run python -m src.scripts.send_messages --bot all
+# send-messages:
+# 	@echo "Uruchamianie wysyłania wiadomości dla wszystkich botów..."
+# 	uv run python -m src.scripts.send_messages --bot all
 
 # Bot leasing
-scrape-leasing:
+scrape:
 	@echo "Uruchamianie scrapowania dla bota: leasing..."
 	uv run python -m src.scripts.scrape_posts --bot leasing
 
-classify-leasing:
+classify:
 	@echo "Uruchamianie klasyfikacji dla bota: leasing..."
 	uv run python -m src.scripts.classify_posts --bot leasing
 
-send-leasing:
+send:
 	@echo "Uruchamianie wysyłania wiadomości dla bota: leasing..."
 	uv run python -m src.scripts.send_messages --bot leasing
 

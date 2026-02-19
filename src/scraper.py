@@ -436,16 +436,32 @@ class FacebookScraper:
         scraped_posts = 0
         dane_z_postu = []
         old_posts_streak = 0
+        no_new_posts_streak = 0
+        MAX_NO_NEW_POSTS_STREAK = 3
 
         try:
             while True:
                 # Scroll and refresh posts list if near the end
                 if current_index >= number_of_posts - 2:
+                    prev_count = number_of_posts
                     await self.human_like_scroll()
                     await self.random_delay(1, 2)
                     posts = await self.page.locator('[role="feed"] [aria-posinset]').all()
                     number_of_posts = len(posts)
                     logger.debug(f"Found {number_of_posts} total posts in DOM")
+
+                    if number_of_posts <= prev_count:
+                        no_new_posts_streak += 1
+                        logger.warning(f"No new posts loaded after scroll ({no_new_posts_streak}/{MAX_NO_NEW_POSTS_STREAK})")
+                        if no_new_posts_streak >= MAX_NO_NEW_POSTS_STREAK:
+                            logger.warning("Facebook stopped loading new posts (scroll blocked?), moving on.")
+                            break
+                    else:
+                        no_new_posts_streak = 0
+
+                    if current_index >= number_of_posts:
+                        logger.warning("current_index beyond post list, stopping.")
+                        break
 
                 await self.random_delay(1, 2)
                 post = posts[current_index]
