@@ -215,6 +215,7 @@ class FacebookScraper:
 
         if not await self.is_logged_in():
             loop = asyncio.get_event_loop()
+            await self.page.goto("https://www.facebook.com")
             await loop.run_in_executor(None, input, "Nie znaleziono aktywnej sesji. Zaloguj się ręcznie i naciśnij Enter...")
 
     async def get_message_box(self, user_id: str):
