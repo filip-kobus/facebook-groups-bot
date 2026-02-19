@@ -214,7 +214,8 @@ class FacebookScraper:
         self.page = await self.browser.new_page()
 
         if not await self.is_logged_in():
-            input("Nie znaleziono aktywnej sesji. Zaloguj się ręcznie i naciśnij Enter...")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, input, "Nie znaleziono aktywnej sesji. Zaloguj się ręcznie i naciśnij Enter...")
 
     async def get_message_box(self, user_id: str):
         """Open Facebook Messenger."""

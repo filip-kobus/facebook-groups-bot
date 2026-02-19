@@ -1,0 +1,58 @@
+version: '3'
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  setup:
+    desc: "Instaluje zależności projektu"
+    cmds:
+      - uv sync
+      - uv run playwright install chromium
+
+  scrape:
+    desc: "Scrapuje posty dla bota leasing"
+    cmds:
+      - uv run python -m src.scripts.scrape_posts --bot leasing
+
+  scrape-car-buyers:
+    desc: "Scrapuje posty dla bota car_buyers"
+    cmds:
+      - uv run python -m src.scripts.scrape_posts --bot car_buyers
+
+  classify:
+    desc: "Klasyfikuje posty dla bota leasing"
+    cmds:
+      - uv run python -m src.scripts.classify_posts --bot leasing
+
+  classify-car-buyers:
+    desc: "Klasyfikuje posty dla bota car_buyers"
+    cmds:
+      - uv run python -m src.scripts.classify_posts --bot car_buyers
+
+  send:
+    desc: "Wysyła wiadomości dla bota leasing"
+    cmds:
+      - uv run python -m src.scripts.send_messages --bot leasing
+
+  send-car-buyers:
+    desc: "Wysyła wiadomości dla bota car_buyers"
+    cmds:
+      - uv run python -m src.scripts.send_messages --bot car_buyers
+
+  list:
+    desc: "Wyświetla listę leadów"
+    cmds:
+      - uv run python -m src.scripts.list_posts
+
+  sync-status:
+    desc: "Wyświetla czas od ostatniej synchronizacji dla każdej grupy"
+    cmds:
+      - uv run python -m src.scripts.check_sync_status
+
+  admin:
+    desc: "Uruchamia panel admina"
+    cmds:
+      - uv run uvicorn src.admin_panel.app:app --reload
